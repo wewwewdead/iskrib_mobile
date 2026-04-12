@@ -1,0 +1,18 @@
+node_modules/
+npm-debug.log*
+
+# React Native app artifacts
+apps/mobile/node_modules/
+apps/mobile/android/.gradle/
+apps/mobile/android/build/
+apps/mobile/android/app/build/
+apps/mobile/ios/Pods/
+apps/mobile/ios/build/
+apps/mobile/.bundle/
+
+# Environment files
+*.env
+*.env.local
+apps/mobile/.env
+apps/mobile/.env.local
+.gstack/

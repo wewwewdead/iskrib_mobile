@@ -1,0 +1,160 @@
+import {Platform, TextStyle} from 'react-native';
+
+// Font family constants matching web app's four typefaces
+export const fonts = {
+  // UI text, buttons, labels (maps to web --font-ui: "Outfit")
+  ui: {
+    regular: Platform.select({ios: 'Outfit-Regular', android: 'Outfit-Regular'}) ?? 'Outfit-Regular',
+    medium: Platform.select({ios: 'Outfit-Medium', android: 'Outfit-Medium'}) ?? 'Outfit-Medium',
+    semiBold: Platform.select({ios: 'Outfit-SemiBold', android: 'Outfit-SemiBold'}) ?? 'Outfit-SemiBold',
+    bold: Platform.select({ios: 'Outfit-Bold', android: 'Outfit-Bold'}) ?? 'Outfit-Bold',
+  },
+  // Body/reading content (maps to web --font-serif: "Lora")
+  serif: {
+    regular: Platform.select({ios: 'Lora-Regular', android: 'Lora-Regular'}) ?? 'Lora-Regular',
+    italic: Platform.select({ios: 'Lora-Italic', android: 'Lora-Italic'}) ?? 'Lora-Italic',
+    bold: Platform.select({ios: 'Lora-Bold', android: 'Lora-Bold'}) ?? 'Lora-Bold',
+  },
+  // Post titles, headings (maps to web "Lexend Deca")
+  heading: {
+    semiBold: Platform.select({ios: 'LexendDeca-SemiBold', android: 'LexendDeca-SemiBold'}) ?? 'LexendDeca-SemiBold',
+    bold: Platform.select({ios: 'LexendDeca-Bold', android: 'LexendDeca-Bold'}) ?? 'LexendDeca-Bold',
+  },
+  // Brand "iskrib" logo text (maps to web "Playfair Display")
+  brand: {
+    semiBold: Platform.select({ios: 'PlayfairDisplay-SemiBold', android: 'PlayfairDisplay-SemiBold'}) ?? 'PlayfairDisplay-SemiBold',
+    semiBoldItalic: Platform.select({ios: 'PlayfairDisplay-SemiBoldItalic', android: 'PlayfairDisplay-SemiBoldItalic'}) ?? 'PlayfairDisplay-SemiBoldItalic',
+  },
+} as const;
+
+// Type scale presets
+export const typeScale = {
+  // Brand logo (Playfair Display)
+  hero: {
+    fontFamily: fonts.brand.semiBold,
+    fontSize: 32,
+    lineHeight: 40,
+    letterSpacing: 0.5,
+  } as TextStyle,
+
+  // Page headings (Lexend Deca)
+  h1: {
+    fontFamily: fonts.heading.bold,
+    fontSize: 24,
+    lineHeight: 32,
+    letterSpacing: -0.2,
+  } as TextStyle,
+
+  h2: {
+    fontFamily: fonts.heading.semiBold,
+    fontSize: 20,
+    lineHeight: 28,
+    letterSpacing: -0.1,
+  } as TextStyle,
+
+  h3: {
+    fontFamily: fonts.heading.semiBold,
+    fontSize: 17,
+    lineHeight: 24,
+  } as TextStyle,
+
+  // Post titles in cards (Lexend Deca)
+  cardTitle: {
+    fontFamily: fonts.heading.bold,
+    fontSize: 15,
+    lineHeight: 21,
+  } as TextStyle,
+
+  // Body text (Lora serif)
+  body: {
+    fontFamily: fonts.serif.regular,
+    fontSize: 16,
+    lineHeight: 26,
+  } as TextStyle,
+
+  bodySmall: {
+    fontFamily: fonts.serif.regular,
+    fontSize: 14,
+    lineHeight: 22,
+  } as TextStyle,
+
+  // UI text (Outfit)
+  ui: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 15,
+    lineHeight: 22,
+  } as TextStyle,
+
+  uiMedium: {
+    fontFamily: fonts.ui.medium,
+    fontSize: 15,
+    lineHeight: 22,
+  } as TextStyle,
+
+  // Captions and small text (Outfit)
+  caption: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 12,
+    lineHeight: 16,
+    letterSpacing: 0.2,
+  } as TextStyle,
+
+  // Labels (Outfit uppercase)
+  label: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 11,
+    lineHeight: 14,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  } as TextStyle,
+
+  // Buttons (Outfit)
+  button: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 15,
+    lineHeight: 20,
+    letterSpacing: 0.3,
+  } as TextStyle,
+
+  buttonSmall: {
+    fontFamily: fonts.ui.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: 0.2,
+  } as TextStyle,
+
+  // Tab bar labels
+  tabLabel: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 11,
+    lineHeight: 14,
+  } as TextStyle,
+} as const;
+
+/** Returns a copy of typeScale with all fontSize / lineHeight values multiplied by `scale`. */
+export function createScaledTypeScale(scale: number): typeof typeScale {
+  if (scale === 1) return typeScale;
+
+  const s = <T extends TextStyle>(style: T): T => ({
+    ...style,
+    fontSize: Math.round((style.fontSize ?? 16) * scale),
+    lineHeight: style.lineHeight ? Math.round(style.lineHeight * scale) : undefined,
+  });
+
+  return {
+    hero: s(typeScale.hero),
+    h1: s(typeScale.h1),
+    h2: s(typeScale.h2),
+    h3: s(typeScale.h3),
+    cardTitle: s(typeScale.cardTitle),
+    body: s(typeScale.body),
+    bodySmall: s(typeScale.bodySmall),
+    ui: s(typeScale.ui),
+    uiMedium: s(typeScale.uiMedium),
+    caption: s(typeScale.caption),
+    label: s(typeScale.label),
+    button: s(typeScale.button),
+    buttonSmall: s(typeScale.buttonSmall),
+    tabLabel: s(typeScale.tabLabel),
+  } as typeof typeScale;
+}

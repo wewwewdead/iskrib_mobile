@@ -1,0 +1,22 @@
+{
+  "name": "iskrib_mobile_app",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:mobile": "npm run -w @iskrib/mobile start",
+    "android": "npm run -w @iskrib/mobile android",
+    "build:playstore": "npm run -w @iskrib/mobile android:bundle:release",
+    "ios": "npm run -w @iskrib/mobile ios",
+    "lint": "npm run -w @iskrib/mobile lint",
+    "typecheck": "npm run -w @iskrib/mobile typecheck",
+    "test": "npm run -w @iskrib/mobile test",
+    "verify:mobile": "npm run -w @iskrib/mobile verify"
+  },
+  "dependencies": {
+    "hermes-compiler": "^250829098.0.9"
+  }
+}

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iskrib SOTA Design - Onboarding + Editor + Feed</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    background: #1a1a1a;
+    color: #333;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 40px;
+    padding: 40px;
+    justify-content: center;
+  }
+
+  h1 {
+    width: 100%;
+    text-align: center;
+    color: #F0EBE3;
+    font-size: 24px;
+    font-weight: 300;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+  .subtitle {
+    width: 100%;
+    text-align: center;
+    color: #888;
+    font-size: 13px;
+    margin-bottom: 30px;
+    font-style: italic;
+  }
+
+  /* Phone frame */
+  .phone {
+    width: 280px;
+    height: 560px;
+    border-radius: 32px;
+    border: 2px solid #444;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .phone-label {
+    text-align: center;
+    color: #C4943E;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    font-family: system-ui, sans-serif;
+  }
+  .phone-sublabel {
+    text-align: center;
+    color: #777;
+    font-size: 10px;
+    margin-top: 8px;
+    font-family: system-ui, sans-serif;
+    max-width: 280px;
+    line-height: 1.5;
+  }
+  .screen-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ============ SCREEN 1: FIRST OPEN ============ */
+  /* Warm, minimal. Single word. Breathing animation feel. */
+  .s1 {
+    background: #FAF9F6;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 30px;
+  }
+  .s1 .logo {
+    font-size: 42px;
+    font-weight: 300;
+    color: #1A1612;
+    letter-spacing: 3px;
+    font-style: italic;
+    /* Playfair Display feel */
+  }
+  .s1 .tagline {
+    font-size: 14px;
+    color: #8A7A6A;
+    margin-top: 16px;
+    font-weight: 300;
+    letter-spacing: 0.5px;
+  }
+  .s1 .cursor-line {
+    width: 1px;
+    height: 40px;
+    background: #C4943E;
+    margin-top: 40px;
+    /* Represents the blinking cursor — the invitation to write */
+  }
+  .s1 .tap-hint {
+    position: absolute;
+    bottom: 60px;
+    font-size: 11px;
+    color: #bbb;
+    font-family: system-ui, sans-serif;
+    letter-spacing: 1px;
+  }
+  /* Design note: No buttons, no sign-up form, no feature list.
+     Just the brand and a blinking cursor. Tap anywhere.
+     Honk philosophy: subtraction. The absence IS the design. */
+
+  /* ============ SCREEN 2: ONBOARDING — WRITE FIRST ============ */
+  .s2 {
+    background: #FAF9F6;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 60px 24px 40px;
+  }
+  .s2 .prompt {
+    font-size: 22px;
+    color: #1A1612;
+    font-style: italic;
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+  .s2 .writing-area {
+    flex: 1;
+    border: none;
+    font-size: 16px;
+    color: #5A4A3A;
+    line-height: 1.8;
+    font-style: italic;
+  }
+  .s2 .typed-text {
+    color: #1A1612;
+    font-style: normal;
+  }
+  .s2 .cursor {
+    display: inline-block;
+    width: 2px;
+    height: 18px;
+    background: #C4943E;
+    vertical-align: text-bottom;
+    margin-left: 2px;
+  }
+  .s2 .word-count {
+    text-align: right;
+    font-size: 11px;
+    color: #C4943E;
+    font-family: system-ui, sans-serif;
+    margin-top: 12px;
+    letter-spacing: 0.5px;
+  }
+  .s2 .haptic-hint {
+    position: absolute;
+    bottom: 20px;
+    left: 24px;
+    right: 24px;
+    text-align: center;
+    font-size: 10px;
+    color: #bbb;
+    font-family: system-ui, sans-serif;
+  }
+  /* Design note: User writes BEFORE signing up. The prompt is the onboarding.
+     Gentle haptic pulse every 50 words. Live word count with golden accent.
+     No toolbar visible yet — just pure writing. Honk principle: presence. */
+
+  /* ============ SCREEN 3: EDITOR — FLOW STATE ============ */
+  .s3 {
+    background: #FAF9F6;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 48px 20px 20px;
+  }
+  .s3 .editor-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .s3 .back-btn {
+    font-size: 20px;
+    color: #999;
+  }
+  .s3 .save-indicator {
+    font-size: 10px;
+    color: #8A9E7A;
+    font-family: system-ui, sans-serif;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .s3 .save-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #8A9E7A;
+  }
+  .s3 .title-field {
+    font-size: 24px;
+    color: #1A1612;
+    font-weight: 600;
+    border: none;
+    margin-bottom: 16px;
+    line-height: 1.3;
+    /* Lexend Deca feel */
+    font-family: system-ui, sans-serif;
+  }
+  .s3 .body-text {
+    flex: 1;
+    font-size: 16px;
+    color: #3A3228;
+    line-height: 1.9;
+    /* Lora serif feel */
+  }
+  .s3 .body-text em { color: #6A5A4A; }
+  .s3 .focus-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background: linear-gradient(to top, #FAF9F6, transparent);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 12px;
+  }
+  .s3 .progress-line {
+    width: 60%;
+    height: 2px;
+    background: #E8E0D4;
+    border-radius: 1px;
+    position: relative;
+  }
+  .s3 .progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 35%;
+    height: 100%;
+    background: #C4943E;
+    border-radius: 1px;
+  }
+  /* Design note: Distraction-free editor. No visible toolbar until you select text.
+     Save indicator is a living dot — breathes when saving, solid when saved.
+     Progress bar shows reading-time estimate, not word count.
+     Haptic feedback on paragraph completion. Spring animation on save.
+     Honk principle: flow state through subtraction. */
+
+  /* ============ SCREEN 4: FEED — ALIVE & INTIMATE ============ */
+  .s4 {
+    background: #FAF9F6;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 48px 0 0;
+    overflow: hidden;
+  }
+  .s4 .feed-header {
+    padding: 0 20px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .s4 .feed-title {
+    font-size: 20px;
+    color: #1A1612;
+    font-weight: 600;
+    font-family: system-ui, sans-serif;
+  }
+  .s4 .live-dot-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .s4 .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #8A9E7A;
+  }
+  .s4 .live-text {
+    font-size: 10px;
+    color: #8A9E7A;
+    font-family: system-ui, sans-serif;
+    letter-spacing: 0.5px;
+  }
+  .s4 .writing-now-bar {
+    padding: 10px 20px;
+    background: #F5F0EA;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .s4 .avatars-stack {
+    display: flex;
+    margin-left: 0;
+  }
+  .s4 .mini-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #D4A853;
+    border: 2px solid #F5F0EA;
+    margin-left: -8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: white;
+    font-family: system-ui, sans-serif;
+  }
+  .s4 .mini-avatar:first-child { margin-left: 0; }
+  .s4 .writing-label {
+    font-size: 12px;
+    color: #8A7A6A;
+    font-family: system-ui, sans-serif;
+  }
+  .s4 .feed-card {
+    margin: 8px 16px;
+    padding: 16px;
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #EDE8E0;
+  }
+  .s4 .card-author {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .s4 .author-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #C4943E;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: white;
+    font-family: system-ui, sans-serif;
+    font-weight: 600;
+  }
+  .s4 .author-name {
+    font-size: 13px;
+    color: #1A1612;
+    font-weight: 500;
+    font-family: system-ui, sans-serif;
+  }
+  .s4 .author-time {
+    font-size: 10px;
+    color: #bbb;
+    font-family: system-ui, sans-serif;
+  }
+  .s4 .card-title {
+    font-size: 16px;
+    color: #1A1612;
+    font-weight: 600;
+    margin-bottom: 6px;
+    line-height: 1.3;
+    font-family: system-ui, sans-serif;
+  }
+  .s4 .card-preview {
+    font-size: 14px;
+    color: #6A5A4A;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .s4 .card-actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #F0EBE3;
+  }
+  .s4 .action {
+    font-size: 11px;
+    color: #999;
+    font-family: system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .s4 .tab-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: #FAF9F6;
+    border-top: 1px solid #EDE8E0;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 8px;
+  }
+  .s4 .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .s4 .tab-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: #ddd;
+  }
+  .s4 .tab-icon.active { background: #C4943E; }
+  .s4 .tab-text {
+    font-size: 9px;
+    color: #999;
+    font-family: system-ui, sans-serif;
+  }
+  .s4 .tab-text.active { color: #C4943E; }
+  .s4 .write-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #C4943E;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: -16px;
+    font-size: 22px;
+    color: white;
+    font-weight: 300;
+    box-shadow: 0 4px 12px rgba(196, 148, 62, 0.3);
+  }
+  /* Design note: "Writing now" presence bar shows who's actively writing.
+     Avatars pulse gently. Feed cards have spring-loaded pull gestures.
+     Double-tap a card for a reaction — heart appears at tap point (Honk-style).
+     Write button has a subtle gravity effect — it pulls slightly toward your thumb.
+     Honk principle: presence + delight + real-time awareness. */
+
+  .annotation {
+    position: absolute;
+    font-size: 9px;
+    color: #C4943E;
+    font-family: system-ui, sans-serif;
+    background: rgba(26, 22, 18, 0.85);
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<h1>iskrib</h1>
+<div class="subtitle">SOTA Experience Layer &mdash; Benji Taylor / Honk Philosophy Applied</div>
+
+<!-- SCREEN 1: FIRST OPEN -->
+<div class="screen-group">
+  <div class="phone-label">1. First Open</div>
+  <div class="phone">
+    <div class="s1">
+      <div class="logo">iskrib</div>
+      <div class="tagline">your words, your world</div>
+      <div class="cursor-line"></div>
+      <div class="tap-hint">tap anywhere to begin</div>
+      <!-- Annotations for design decisions -->
+      <div class="annotation" style="top: 14px; left: 12px;">no buttons</div>
+      <div class="annotation" style="bottom: 100px; right: 12px;">blinking cursor</div>
+      <div class="annotation" style="top: 200px; right: 12px;">spring fade-in</div>
+    </div>
+  </div>
+  <div class="phone-sublabel">Radical subtraction. No sign-up form,<br>no feature tour. Just identity + invitation.<br>Haptic pulse on tap. 300ms spring transition.</div>
+</div>
+
+<!-- SCREEN 2: WRITE-FIRST ONBOARDING -->
+<div class="screen-group">
+  <div class="phone-label">2. Write First</div>
+  <div class="phone">
+    <div class="s2">
+      <div class="prompt">What's on your mind right now?</div>
+      <div class="writing-area">
+        <span class="typed-text">I've been thinking about how the best conversations happen when nobody's trying to impress anyone. Just honest words</span><span class="cursor"></span>
+      </div>
+      <div class="word-count">23 words</div>
+      <div class="haptic-hint">~ gentle pulse every 50 words ~</div>
+      <div class="annotation" style="top: 14px; right: 12px;">no account yet</div>
+      <div class="annotation" style="bottom: 60px; left: 12px;">live count</div>
+    </div>
+  </div>
+  <div class="phone-sublabel">Write BEFORE signing up. The prompt<br>IS the onboarding. Save triggers account<br>creation. Honk principle: value before gates.</div>
+</div>
+
+<!-- SCREEN 3: EDITOR -->
+<div class="screen-group">
+  <div class="phone-label">3. Flow-State Editor</div>
+  <div class="phone">
+    <div class="s3">
+      <div class="editor-top">
+        <div class="back-btn">&larr;</div>
+        <div class="save-indicator"><div class="save-dot"></div>SAVED</div>
+      </div>
+      <div class="title-field">On Honest Conversations</div>
+      <div class="body-text">
+        I've been thinking about how the best conversations happen when nobody's trying to impress anyone. Just honest words, flowing naturally.<br><br>
+        <em>There's something about writing that strips away the performance. When it's just you and the blank page, pretense feels exhausting...</em>
+      </div>
+      <div class="focus-bar">
+        <div class="progress-line">
+          <div class="progress-fill"></div>
+        </div>
+      </div>
+      <div class="annotation" style="top: 58px; right: 12px;">breathing dot</div>
+      <div class="annotation" style="bottom: 56px; right: 12px;">reading time bar</div>
+      <div class="annotation" style="top: 120px; left: 12px;">no toolbar visible</div>
+    </div>
+  </div>
+  <div class="phone-sublabel">Distraction-free. Toolbar appears only on<br>text selection (spring animation). Save dot<br>breathes. Progress = reading time, not words.</div>
+</div>
+
+<!-- SCREEN 4: FEED -->
+<div class="screen-group">
+  <div class="phone-label">4. Living Feed</div>
+  <div class="phone">
+    <div class="s4">
+      <div class="feed-header">
+        <div class="feed-title">Home</div>
+        <div class="live-dot-container">
+          <div class="live-dot"></div>
+          <div class="live-text">3 writing now</div>
+        </div>
+      </div>
+
+      <div class="writing-now-bar">
+        <div class="avatars-stack">
+          <div class="mini-avatar">S</div>
+          <div class="mini-avatar" style="background: #8A9E7A;">M</div>
+          <div class="mini-avatar" style="background: #A08060;">J</div>
+        </div>
+        <div class="writing-label">Sara, Mika & Jay are writing...</div>
+      </div>
+
+      <div class="feed-card">
+        <div class="card-author">
+          <div class="author-avatar">A</div>
+          <div>
+            <div class="author-name">Amara Chen</div>
+            <div class="author-time">2 min ago &middot; 3 min read</div>
+          </div>
+        </div>
+        <div class="card-title">The Art of Slowing Down</div>
+        <div class="card-preview">We move so fast that we forget what stillness feels like. Last week I left my phone in a drawer for an entire Saturday...</div>
+        <div class="card-actions">
+          <div class="action">&hearts; 12</div>
+          <div class="action">&#x1f4ac; 4</div>
+          <div class="action">&#x1f516;</div>
+        </div>
+      </div>
+
+      <div class="feed-card" style="opacity: 0.7;">
+        <div class="card-author">
+          <div class="author-avatar" style="background: #8A9E7A;">R</div>
+          <div>
+            <div class="author-name">Reese Walters</div>
+            <div class="author-time">18 min ago &middot; 5 min read</div>
+          </div>
+        </div>
+        <div class="card-title">Letters I'll Never Send</div>
+        <div class="card-preview">Dear younger me, stop trying so hard to be understood. The people who matter will read between...</div>
+      </div>
+
+      <div class="tab-bar">
+        <div class="tab">
+          <div class="tab-icon active"></div>
+          <div class="tab-text active">Home</div>
+        </div>
+        <div class="tab">
+          <div class="tab-icon"></div>
+          <div class="tab-text">Explore</div>
+        </div>
+        <div class="write-btn">+</div>
+        <div class="tab">
+          <div class="tab-icon"></div>
+          <div class="tab-text">Alerts</div>
+        </div>
+        <div class="tab">
+          <div class="tab-icon"></div>
+          <div class="tab-text">Profile</div>
+        </div>
+      </div>
+
+      <div class="annotation" style="top: 68px; right: 8px;">real-time presence</div>
+      <div class="annotation" style="top: 148px; left: 8px;">double-tap = heart</div>
+      <div class="annotation" style="bottom: 62px; left: 8px;">spring-loaded pull</div>
+    </div>
+  </div>
+  <div class="phone-sublabel">"Writing now" bar shows real-time presence.<br>Double-tap for Honk-style heart at tap point.<br>Cards spring on scroll. FAB has gravity pull.</div>
+</div>
+
+</body>
+</html>

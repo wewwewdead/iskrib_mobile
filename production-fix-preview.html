@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iskrib Production Fix Preview</title>
+<style>
+@font-face{font-family:'Outfit';src:url('./apps/mobile/assets/fonts/Outfit-Regular.ttf') format('truetype');font-weight:400}
+@font-face{font-family:'Outfit';src:url('./apps/mobile/assets/fonts/Outfit-SemiBold.ttf') format('truetype');font-weight:600}
+@font-face{font-family:'Outfit';src:url('./apps/mobile/assets/fonts/Outfit-Bold.ttf') format('truetype');font-weight:700}
+@font-face{font-family:'Lora';src:url('./apps/mobile/assets/fonts/Lora-Regular.ttf') format('truetype');font-weight:400}
+@font-face{font-family:'Lora';src:url('./apps/mobile/assets/fonts/Lora-Italic.ttf') format('truetype');font-style:italic;font-weight:400}
+@font-face{font-family:'Lexend Deca';src:url('./apps/mobile/assets/fonts/LexendDeca-SemiBold.ttf') format('truetype');font-weight:600}
+@font-face{font-family:'Lexend Deca';src:url('./apps/mobile/assets/fonts/LexendDeca-Bold.ttf') format('truetype');font-weight:700}
+@font-face{font-family:'Playfair Display';src:url('./apps/mobile/assets/fonts/PlayfairDisplay-SemiBoldItalic.ttf') format('truetype');font-style:italic;font-weight:600}
+:root{--bg:#faf9f6;--bg2:#f3f1ed;--card:#fff;--text:#1a1612;--heading:#12100d;--sub:#6b6560;--muted:#a8a29e;--gold:#c4943e;--amber:#d4a853;--sage:#8a9e7a;--ink:#1f1a15;--line:rgba(120,100,80,.12);--shadow:0 18px 50px rgba(70,50,30,.12)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Outfit',sans-serif;background:linear-gradient(180deg,#f7f4ee 0%,#faf9f6 45%,#efe9df 100%);color:var(--text);padding:32px 18px 64px}
+.wrap{max-width:1280px;margin:0 auto}
+.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:22px;margin-bottom:22px}
+.panel{background:rgba(255,255,255,.78);backdrop-filter:blur(10px);border:1px solid rgba(120,100,80,.08);border-radius:26px;box-shadow:var(--shadow)}
+.intro{padding:34px}
+.eyebrow{display:inline-block;padding:8px 12px;border-radius:999px;background:rgba(212,168,83,.12);color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:18px}
+h1{font-family:'Lexend Deca',sans-serif;font-size:clamp(34px,5vw,54px);line-height:1.02;color:var(--heading);max-width:11ch;margin-bottom:14px}
+.intro p{font-size:17px;line-height:1.75;color:var(--sub);max-width:58ch}
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.chip{padding:10px 14px;border-radius:999px;background:var(--bg2);border:1px solid var(--line);font-size:13px;color:var(--sub)}
+.rules{padding:24px}
+.rules h2{font-family:'Lexend Deca',sans-serif;font-size:22px;color:var(--heading);margin-bottom:12px}
+.rule{display:grid;grid-template-columns:40px 1fr;gap:12px;padding:12px;border-radius:18px;background:var(--bg);border:1px solid var(--line);margin-bottom:10px}
+.num{width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(180deg,#d9ba7a,var(--gold));font-weight:700}
+.rule strong{display:block;font-size:14px;color:var(--heading);margin-bottom:4px}
+.rule span{display:block;font-size:14px;line-height:1.6;color:var(--sub)}
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
+.stat{padding:18px;border-radius:20px;background:rgba(255,255,255,.82);border:1px solid rgba(120,100,80,.08);box-shadow:0 10px 26px rgba(70,50,30,.08)}
+.label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px}
+.value{font-family:'Lexend Deca',sans-serif;font-size:18px;color:var(--heading);margin-bottom:6px}
+.stat p{font-size:14px;line-height:1.6;color:var(--sub)}
+.section-head{margin-bottom:18px}
+.section-head h3{font-family:'Lexend Deca',sans-serif;font-size:28px;color:var(--heading);margin-bottom:8px}
+.section-head p{font-size:15px;line-height:1.65;color:var(--sub);max-width:72ch}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.screen-title{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px}
+.screen-title strong{font-family:'Lexend Deca',sans-serif;font-size:18px;color:var(--heading)}
+.tag{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gold)}
+.screen-copy{font-size:14px;line-height:1.55;color:var(--sub);margin-bottom:12px;min-height:44px}
+.phone{position:relative;height:668px;padding:14px;border-radius:34px;background:linear-gradient(180deg,#2a2520,#15120f);box-shadow:0 24px 70px rgba(36,24,15,.22)}
+.phone:before{content:'';position:absolute;top:10px;left:50%;transform:translateX(-50%);width:126px;height:18px;border-radius:0 0 14px 14px;background:#15120f}
+.face{height:100%;border-radius:24px;overflow:hidden;background:radial-gradient(circle at top right,rgba(212,168,83,.1),transparent 30%),var(--bg);padding:30px 18px 20px;position:relative}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.brand{font-family:'Playfair Display',serif;font-size:26px;color:var(--heading);letter-spacing:1px}
+.topline{font-size:11px;color:var(--muted);margin-bottom:16px}
+.icon{width:36px;height:36px;border-radius:18px;display:grid;place-items:center;background:rgba(255,255,255,.86);border:1px solid var(--line);color:var(--sub)}
+.search{height:42px;border-radius:16px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;padding:0 14px;font-size:14px;color:var(--muted);margin-bottom:12px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px;border-radius:16px;background:rgba(255,255,255,.86);border:1px solid var(--line);margin-bottom:12px}
+.seg span{padding:10px 8px;text-align:center;border-radius:12px;font-size:13px;color:var(--muted)}
+.seg .active{background:var(--ink);color:var(--bg)}
+.presence{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:18px;background:rgba(138,158,122,.1);border:1px solid rgba(138,158,122,.18);margin-bottom:12px}
+.avatars{display:flex;align-items:center}
+.avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--bg);margin-left:-8px;color:#fff;font-size:11px;font-weight:700}
+.avatar:first-child{margin-left:0}
+.presence p{font-size:12px;line-height:1.45;color:var(--sub)}
+.card{background:rgba(255,255,255,.92);border:1px solid rgba(120,100,80,.08);border-radius:22px;box-shadow:0 12px 28px rgba(70,50,30,.08)}
+.hero-card{overflow:hidden;margin-bottom:12px}
+.media{height:132px;background:linear-gradient(135deg,rgba(42,37,32,.08),rgba(212,168,83,.16)),linear-gradient(180deg,#eadfcf,#d4c4a8)}
+.body{padding:16px}
+.meta{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;color:var(--muted);margin-bottom:10px}
+.meta strong{color:var(--sub);font-weight:600}
+.title{font-family:'Lexend Deca',sans-serif;font-size:17px;line-height:1.35;color:var(--heading);margin-bottom:10px}
+.copy{font-family:'Lora',serif;font-size:14px;line-height:1.7;color:#4f473f;margin-bottom:12px}
+.actions{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.compact{display:grid;grid-template-columns:1fr 68px;gap:12px;padding:14px;margin-bottom:10px}
+.thumb{border-radius:14px;background:linear-gradient(180deg,#ece6dc,#d9c9ad)}
+.compact .title{font-size:15px;margin-bottom:6px}
+.compact .copy{font-size:13px;line-height:1.6;margin-bottom:0}
+.fab{position:absolute;right:18px;bottom:82px;width:56px;height:56px;border-radius:28px;display:grid;place-items:center;background:linear-gradient(180deg,#d9ba7a,var(--amber));color:#1a1612;font-size:28px;box-shadow:0 16px 30px rgba(196,148,62,.34);animation:breathe 3s ease-in-out infinite}
+.tabs{position:absolute;left:14px;right:14px;bottom:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 12px;border-radius:22px;background:rgba(255,255,255,.92);border:1px solid rgba(120,100,80,.08);box-shadow:0 10px 28px rgba(60,45,30,.10)}
+.tabs div{text-align:center;font-size:11px;color:var(--muted)}
+.tabs .active{color:var(--heading);font-weight:700}
+.writer{display:flex;flex-direction:column;justify-content:space-between;height:100%}
+.writer h4{font-family:'Lora',serif;font-style:italic;font-size:28px;line-height:1.35;color:var(--heading);margin-bottom:16px}
+.writer p{font-size:14px;line-height:1.7;color:var(--sub);max-width:26ch}
+.sheet{padding:20px 18px 18px;border-radius:24px 24px 0 0;background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.98));border-top:1px solid rgba(120,100,80,.1);box-shadow:0 -14px 30px rgba(70,50,30,.08)}
+.sheet .label{color:var(--gold);margin-bottom:10px}
+.draft{font-family:'Lora',serif;font-size:17px;line-height:1.95;color:#2a241e;min-height:174px}
+.cursor{display:inline-block;width:2px;height:18px;background:var(--amber);margin-left:3px;vertical-align:-3px;animation:blink 1.2s step-end infinite}
+.sheet-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(120,100,80,.1)}
+.sheet-foot span{font-size:12px;color:var(--muted)}
+.cta{padding:10px 14px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:12px;font-weight:700}
+.topic-row{display:flex;gap:8px;margin-bottom:12px}
+.topic{padding:8px 12px;border-radius:999px;background:var(--bg2);border:1px solid var(--line);font-size:12px;color:var(--sub)}
+.topic.active{background:rgba(212,168,83,.12);color:var(--gold)}
+.ed-card{padding:16px;margin-bottom:12px}
+.kicker{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:10px}
+.ed-list{display:grid;gap:10px}
+.ed-row{display:grid;grid-template-columns:1fr 58px;gap:10px;padding:12px 0;border-top:1px solid rgba(120,100,80,.1)}
+.ed-row:first-child{border-top:none;padding-top:0}
+.mini{border-radius:14px;background:linear-gradient(180deg,#e7ded0,#c9b493)}
+.ed-row strong{display:block;font-family:'Lexend Deca',sans-serif;font-size:14px;line-height:1.4;color:var(--heading);margin-bottom:4px}
+.ed-row span{display:block;font-size:12px;line-height:1.55;color:var(--sub)}
+.profile-head{margin:-30px -18px 0;padding:30px 18px 18px;border-bottom-left-radius:24px;border-bottom-right-radius:24px;background:linear-gradient(150deg,rgba(26,22,18,.16),rgba(212,168,83,.12)),linear-gradient(135deg,#ddd2bf,#f5efe4 60%,#ece4d8);min-height:172px}
+.p-avatar{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(180deg,#a08060,#7f5f45);border:4px solid rgba(255,255,255,.9);font-family:'Lexend Deca',sans-serif;font-size:28px;color:#fff;box-shadow:0 10px 24px rgba(70,50,30,.14)}
+.profile h4{font-family:'Lexend Deca',sans-serif;font-size:22px;color:var(--heading);margin:14px 0 4px}
+.handle{font-size:14px;color:var(--sub);margin-bottom:10px}
+.bio{font-family:'Lora',serif;font-size:14px;line-height:1.65;color:#4f473f}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0 14px}
+.stats-row .stat{padding:12px 10px;text-align:center;background:rgba(255,255,255,.86);box-shadow:none}
+.stats-row .value{font-size:16px;margin-bottom:4px}
+.profile-actions{display:grid;grid-template-columns:1fr 42px;gap:10px;margin-bottom:12px}
+.primary{display:grid;place-items:center;height:42px;border-radius:16px;background:var(--ink);color:var(--bg);font-size:13px;font-weight:700}
+.quiet{display:grid;place-items:center;height:42px;border-radius:16px;background:rgba(255,255,255,.86);border:1px solid var(--line);color:var(--sub)}
+.subnav{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px;border-radius:16px;background:rgba(255,255,255,.86);border:1px solid var(--line);margin-bottom:12px}
+.subnav div{text-align:center;padding:10px 6px;border-radius:12px;font-size:13px;color:var(--muted)}
+.subnav .active{background:rgba(212,168,83,.12);color:var(--gold);font-weight:700}
+.footer{margin-top:28px;padding:24px;border-radius:24px;background:rgba(255,255,255,.82);border:1px solid rgba(120,100,80,.08);box-shadow:0 10px 30px rgba(60,45,30,.08)}
+.footer h3{font-family:'Lexend Deca',sans-serif;font-size:24px;color:var(--heading);margin-bottom:12px}
+.footer-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.foot-card{padding:16px;border-radius:18px;background:var(--bg);border:1px solid var(--line)}
+.foot-card strong{display:block;font-size:14px;color:var(--heading);margin-bottom:6px}
+.foot-card p{font-size:14px;line-height:1.6;color:var(--sub)}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+@media (max-width:1150px){.hero{grid-template-columns:1fr}.strip,.grid{grid-template-columns:repeat(2,1fr)}.footer-grid{grid-template-columns:1fr}}
+@media (max-width:720px){body{padding:24px 14px 52px}.intro,.rules,.footer{padding:22px 18px}.strip,.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <div class="panel intro">
+      <div class="eyebrow">Production UI Direction</div>
+      <h1>Make Iskrib feel like one product again.</h1>
+      <p>This preview turns the audit into a concrete direction: fewer competing actions, stronger editorial hierarchy, tighter profile personalization, and a refined onboarding flow that feels premium without turning setup into a form-heavy wizard.</p>
+      <div class="chips">
+        <div class="chip">Refined setup, then creation</div>
+        <div class="chip">One dominant action per screen</div>
+        <div class="chip">Editorial Explore, not feed-plus-rankings</div>
+        <div class="chip">Curated personalization only</div>
+      </div>
+    </div>
+    <aside class="panel rules">
+      <h2>Core Product Rules</h2>
+      <div class="rule"><div class="num">1</div><div><strong>Subtraction first</strong><span>Home and onboarding stop competing with themselves. The product should feel quiet, not crowded.</span></div></div>
+      <div class="rule"><div class="num">2</div><div><strong>Accent means priority</strong><span>Gold and amber are reserved for the action or signal that matters most in the moment.</span></div></div>
+      <div class="rule"><div class="num">3</div><div><strong>Identity over utility</strong><span>Profile leads with the writer, not with dashboard shortcuts fighting for attention.</span></div></div>
+      <div class="rule"><div class="num">4</div><div><strong>Distinct surfaces</strong><span>Explore, Home, and Profile each get a different job and a different rhythm.</span></div></div>
+    </aside>
+  </section>
+
+  <section class="strip">
+    <div class="stat"><div class="label">Onboarding</div><div class="value">Calm setup with fewer steps</div><p>Users still get an onboarding flow, but it is tighter, warmer, and more intentional than the current multi-card sequence.</p></div>
+    <div class="stat"><div class="label">Home</div><div class="value">One calm feed</div><p>Search, presence, and feed controls stay, but in a quieter order with less UI competition.</p></div>
+    <div class="stat"><div class="label">Explore</div><div class="value">Editorial curation</div><p>Discovery becomes a magazine-like layer with themes, lists, and highlighted writers.</p></div>
+    <div class="stat"><div class="label">Profile</div><div class="value">Authored identity</div><p>Profiles stay expressive, but the brand stays in control of what expressive means.</p></div>
+  </section>
+
+  <section class="section-head">
+    <h3>Screen Preview</h3>
+    <p>These are HTML mockups of the tightened direction before touching the React Native implementation.</p>
+  </section>
+
+  <section class="grid">
+    <article>
+      <div class="screen-title"><strong>Refined Setup Onboarding</strong><span class="tag">Fix 01</span></div>
+      <div class="screen-copy">Onboarding stays onboarding, but it becomes calmer, shorter, and more premium: welcome first, then profile, interests, and a clear ready state.</div>
+      <div class="phone">
+        <div class="face writer">
+          <div>
+            <div class="row topline"><span>9:41</span><span class="brand">iskrib</span><span>Step 1 of 4</span></div>
+            <h4>Welcome to your quiet writing space.</h4>
+            <p>Set up your profile, choose what draws you to write, and we will shape the app around the kind of creative rhythm you actually want.</p>
+          </div>
+          <div class="sheet">
+            <div class="label">Setup preview</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+              <div class="avatar" style="margin-left:0;width:44px;height:44px;font-size:16px;background:#a08060;border-color:#ffffff;">A</div>
+              <div>
+                <div style="font-family:'Lexend Deca',sans-serif;font-size:15px;color:var(--heading);margin-bottom:3px;">Add your profile</div>
+                <div style="font-size:13px;line-height:1.55;color:var(--sub);">Name, photo, and a short bio that feels like you.</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+              <div class="chip" style="padding:8px 12px;">Essays</div>
+              <div class="chip" style="padding:8px 12px;">Journals</div>
+              <div class="chip" style="padding:8px 12px;">Short Fiction</div>
+            </div>
+            <div style="font-family:'Lora',serif;font-size:15px;line-height:1.75;color:#4f473f;">A shorter sequence keeps the onboarding useful without making it feel like admin work.</div>
+            <div class="sheet-foot"><span>Welcome - Profile - Interests - Ready</span><div class="cta">Let's set up your space</div></div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <article>
+      <div class="screen-title"><strong>Calmer Home Feed</strong><span class="tag">Fix 02</span></div>
+      <div class="screen-copy">One main reading surface. Presence stays, but secondary jumps and loud utility chrome get reduced or absorbed.</div>
+      <div class="phone">
+        <div class="face">
+          <div class="row" style="margin-bottom:14px"><div style="font-family:'Lexend Deca',sans-serif;font-size:24px;color:var(--heading)">Home</div><div class="icon">in</div></div>
+          <div class="search">Search writers or posts</div>
+          <div class="seg"><span class="active">For You</span><span>Following</span><span>Latest</span></div>
+          <div class="presence"><div class="avatars"><div class="avatar" style="background:#c4943e">A</div><div class="avatar" style="background:#8a9e7a">M</div><div class="avatar" style="background:#a08060">J</div></div><p>Amara, Mika, and 4 more are writing right now.</p></div>
+          <div class="card hero-card"><div class="media"></div><div class="body"><div class="meta"><strong>Amara Chen</strong><span>4 min read</span></div><div class="title">The Art of Slowing Down</div><div class="copy">We move so fast that we forget what stillness feels like. Last week I left my phone in a drawer for an entire Saturday and noticed how language returns when noise leaves.</div><div class="actions"><span>218 views</span><span>32 reactions</span><span>9 replies</span></div></div></div>
+          <div class="card compact"><div><div class="meta" style="margin-bottom:8px"><strong>Prompt response</strong><span>2 min read</span></div><div class="title">What I Wish I Had Said Earlier</div><div class="copy">Supporting content stays visible without making the feed noisy.</div></div><div class="thumb"></div></div>
+          <div class="card compact"><div><div class="meta" style="margin-bottom:8px"><strong>Reese Walters</strong><span>5 min read</span></div><div class="title">Letters I Never Sent</div><div class="copy">The product reads like a reading app first, then a social app.</div></div><div class="thumb" style="background:linear-gradient(180deg,#ece8df,#d9d0c5)"></div></div>
+          <div class="fab">+</div>
+          <div class="tabs"><div class="active">Home</div><div>Explore</div><div>Inbox</div><div>Profile</div></div>
+        </div>
+      </div>
+    </article>
+
+    <article>
+      <div class="screen-title"><strong>Editorial Explore</strong><span class="tag">Fix 03</span></div>
+      <div class="screen-copy">Explore stops being hot feed plus rankings and becomes a distinct discovery layer with themes and highlighted writing.</div>
+      <div class="phone">
+        <div class="face">
+          <div class="row topline"><span>9:41</span><span style="font-family:'Lexend Deca',sans-serif;font-size:24px;color:var(--heading)">Explore</span><span>Save</span></div>
+          <p style="font-size:13px;line-height:1.6;color:var(--sub);margin-bottom:12px">Find thoughtful pieces, overlooked writers, and collections worth staying with.</p>
+          <div class="topic-row"><div class="topic active">Quiet Essays</div><div class="topic">Night Writing</div><div class="topic">Short Fiction</div></div>
+          <div class="card ed-card"><div class="kicker">Editor's note</div><div class="title">Writers turning ordinary moments into literature</div><div class="copy" style="margin-bottom:0">A weekly curation surface gives Explore a point of view instead of making it just another ranked list.</div></div>
+          <div class="card ed-card"><div class="kicker">This week</div><div class="ed-list"><div class="ed-row"><div><strong>The Weight of Small Kindnesses</strong><span>Essay by Nila Park, selected for clarity and emotional restraint.</span></div><div class="mini"></div></div><div class="ed-row"><div><strong>How to Leave a City Without Leaving Yourself</strong><span>Travel writing that feels personal rather than promotional.</span></div><div class="mini" style="background:linear-gradient(180deg,#ebdfd0,#cfb79a)"></div></div><div class="ed-row"><div><strong>Three New Voices to Follow</strong><span>A compact social module, still presented with editorial framing.</span></div><div class="mini" style="background:linear-gradient(180deg,#dfe7de,#bdd0b8)"></div></div></div></div>
+          <div class="tabs"><div>Home</div><div class="active">Explore</div><div>Inbox</div><div>Profile</div></div>
+        </div>
+      </div>
+    </article>
+
+    <article class="profile">
+      <div class="screen-title"><strong>Tighter Profile</strong><span class="tag">Fix 04</span></div>
+      <div class="screen-copy">Profile leads with authored identity. Personalization is curated and quiet, not a free-for-all of competing gradients and accent colors.</div>
+      <div class="phone">
+        <div class="face">
+          <div class="profile-head"><div class="row" style="justify-content:flex-end;margin-bottom:28px"><div class="icon">set</div></div><div class="p-avatar">A</div></div>
+          <h4>Amara Chen</h4>
+          <div class="handle">@amarawrites</div>
+          <div class="bio">Essays on attention, slowness, and the strange tenderness of ordinary days.</div>
+          <div class="stats-row"><div class="stat"><div class="value">28</div><div class="label">Posts</div></div><div class="stat"><div class="value">4.2k</div><div class="label">Readers</div></div><div class="stat"><div class="value">19</div><div class="label">Streak</div></div></div>
+          <div class="profile-actions"><div class="primary">Edit profile</div><div class="quiet">+</div></div>
+          <div class="subnav"><div class="active">Writing</div><div>Stories</div><div>Saved</div></div>
+          <div class="card compact"><div><div class="meta" style="margin-bottom:8px"><strong>Featured essay</strong><span>4 min read</span></div><div class="title">On Choosing a Slower Ambition</div><div class="copy">The writer identity stays dominant. Utilities move down or become secondary.</div></div><div class="thumb"></div></div>
+          <div class="card compact"><div><div class="meta" style="margin-bottom:8px"><strong>Draft in progress</strong><span>Private</span></div><div class="title">Notes on Restlessness</div><div class="copy">Drafts and analytics still exist, but they stop crowding the top of the profile.</div></div><div class="thumb" style="background:linear-gradient(180deg,#e8e6e0,#cfc9bf)"></div></div>
+          <div class="tabs"><div>Home</div><div>Explore</div><div>Inbox</div><div class="active">Profile</div></div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="footer">
+    <h3>What This Preview Is Solving</h3>
+    <div class="footer-grid">
+      <div class="foot-card"><strong>Hierarchy</strong><p>The app stops yelling with every component. Each screen has one job and one obvious next move.</p></div>
+      <div class="foot-card"><strong>Consistency</strong><p>Primary actions use the dark ink button treatment, while gold becomes signal rather than wallpaper.</p></div>
+      <div class="foot-card"><strong>Brand Confidence</strong><p>The literary identity gets stronger because the product is more restrained, not because it adds more decoration.</p></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

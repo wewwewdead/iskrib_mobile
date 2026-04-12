@@ -1,0 +1,90 @@
+import React from 'react';
+import {StatusBar, StyleSheet, Text, View} from 'react-native';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {QueryClientProvider} from '@tanstack/react-query';
+import * as Sentry from '@sentry/react-native';
+import {RootNavigator} from './src/navigation/RootNavigator';
+import {queryClient} from './src/lib/queryClient';
+import * as authProviderModule from './src/features/auth/AuthProvider';
+import {AppErrorBoundary} from './src/components/AppErrorBoundary';
+import {ThemeProvider, useTheme} from './src/theme/ThemeProvider';
+import {MOBILE_ENV} from './src/config/env';
+
+Sentry.init({
+  dsn: MOBILE_ENV.SENTRY_DSN || undefined,
+  enabled: !__DEV__,
+  tracesSampleRate: 0.2,
+});
+
+function AppContent(): React.JSX.Element {
+  const {colors, isDark} = useTheme();
+
+  const AuthProvider = authProviderModule.AuthProvider as
+    | React.ComponentType<{children: React.ReactNode}>
+    | undefined;
+
+  if (!AuthProvider) {
+    return (
+      <View style={[styles.errorContainer, {backgroundColor: colors.bgPrimary}]}>
+        <Text style={[styles.errorTitle, {color: colors.textPrimary}]}>
+          Auth module failed to load
+        </Text>
+        <Text style={[styles.errorBody, {color: colors.textMuted}]}>
+          Restart Metro with --reset-cache and relaunch the app.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <StatusBar
+          barStyle={isDark ? 'light-content' : 'dark-content'}
+          backgroundColor={colors.bgPrimary}
+        />
+        <RootNavigator />
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
+
+function App(): React.JSX.Element {
+  return (
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AppErrorBoundary>
+            <AppContent />
+          </AppErrorBoundary>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  errorContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  errorBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+});
+
+export default App;

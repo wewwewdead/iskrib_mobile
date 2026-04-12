@@ -1,0 +1,200 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`PostCard renders a stable snapshot without onLongPress prop 1`] = `
+<View
+  style={
+    [
+      {
+        "borderRadius": 12,
+        "borderWidth": 1,
+        "overflow": "hidden",
+      },
+      {
+        "backgroundColor": "#111111",
+        "borderColor": "#222222",
+      },
+      {},
+    ]
+  }
+>
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onBlur={[Function]}
+    onClick={[Function]}
+    onFocus={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      [
+        false,
+      ]
+    }
+    testID="post-card"
+  >
+    <View
+      style={
+        {
+          "gap": 8,
+          "paddingBottom": 8,
+          "paddingHorizontal": 16,
+          "paddingTop": 12,
+        }
+      }
+    >
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "flexDirection": "row",
+            "gap": 8,
+          }
+        }
+      >
+        <View
+          accessibilityState={
+            {
+              "busy": undefined,
+              "checked": undefined,
+              "disabled": true,
+              "expanded": undefined,
+              "selected": undefined,
+            }
+          }
+          accessibilityValue={
+            {
+              "max": undefined,
+              "min": undefined,
+              "now": undefined,
+              "text": undefined,
+            }
+          }
+          accessible={true}
+          collapsable={false}
+          focusable={true}
+          onBlur={[Function]}
+          onClick={[Function]}
+          onFocus={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            {
+              "alignItems": "center",
+              "flex": 1,
+              "flexDirection": "row",
+              "gap": 8,
+              "minWidth": 0,
+            }
+          }
+        >
+          <Avatar
+            name="Writer"
+            size={22}
+          />
+          <Text
+            numberOfLines={1}
+            style={
+              [
+                {
+                  "flexShrink": 1,
+                  "fontFamily": "System",
+                  "fontSize": 13,
+                },
+                {
+                  "color": "#DDDDDD",
+                },
+              ]
+            }
+          >
+            Writer
+          </Text>
+        </View>
+        <View
+          style={
+            {
+              "alignItems": "center",
+              "flexDirection": "row",
+              "gap": 4,
+              "marginLeft": 4,
+            }
+          }
+        />
+      </View>
+      <View
+        style={
+          {
+            "alignItems": "flex-start",
+            "flexDirection": "row",
+            "gap": 8,
+          }
+        }
+      >
+        <Text
+          numberOfLines={2}
+          style={
+            [
+              {},
+              {
+                "flex": 1,
+              },
+              {},
+              {
+                "color": "#FFFFFF",
+              },
+            ]
+          }
+        >
+          A post
+        </Text>
+      </View>
+      <Text
+        numberOfLines={3}
+        style={
+          [
+            {
+              "lineHeight": 20,
+            },
+            {},
+            {
+              "color": "#CCCCCC",
+            },
+          ]
+        }
+      >
+        Preview text
+      </Text>
+    </View>
+  </View>
+  <ActionBar
+    commentCount={1}
+    likeCount={2}
+    shareTitle="A post"
+  />
+</View>
+`;

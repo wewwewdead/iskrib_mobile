@@ -1,0 +1,49 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "assets/fonts/LexendDeca-Bold.ttf",
+      "sha1": "ab7a9692bcb277de591c93f5a5e0a0857963088a"
+    },
+    {
+      "path": "assets/fonts/LexendDeca-SemiBold.ttf",
+      "sha1": "e4a1b618c220e518b269750c799c166da99ba24a"
+    },
+    {
+      "path": "assets/fonts/Lora-Bold.ttf",
+      "sha1": "fed1f0122ec21c7a2a963a84f43075f6f4173fa7"
+    },
+    {
+      "path": "assets/fonts/Lora-Italic.ttf",
+      "sha1": "d7ba38c9ad01a3ce38c69e84f8b4bc19d7070cf7"
+    },
+    {
+      "path": "assets/fonts/Lora-Regular.ttf",
+      "sha1": "6813e8ab7fdc05770f64f75573ff1208fff3c862"
+    },
+    {
+      "path": "assets/fonts/Outfit-Bold.ttf",
+      "sha1": "7f80cab803c7eafec1d4deb10ba9a9699a9af552"
+    },
+    {
+      "path": "assets/fonts/Outfit-Medium.ttf",
+      "sha1": "9e9a094b61389254add0df9536fe962a9d668926"
+    },
+    {
+      "path": "assets/fonts/Outfit-Regular.ttf",
+      "sha1": "3024f9b4f58fd6769d8634b6352a423b5cf73647"
+    },
+    {
+      "path": "assets/fonts/Outfit-SemiBold.ttf",
+      "sha1": "7b4dd31fa1c9ada8f879b12f2fff5663115734d2"
+    },
+    {
+      "path": "assets/fonts/PlayfairDisplay-SemiBold.ttf",
+      "sha1": "0aac739ac5e9fc48761edd5803d967de2295adb8"
+    },
+    {
+      "path": "assets/fonts/PlayfairDisplay-SemiBoldItalic.ttf",
+      "sha1": "2241ada3ac774a431a45969c00e3f0fe277da4fb"
+    }
+  ]
+}
