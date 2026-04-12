@@ -16,3 +16,11 @@ apps/mobile/.bundle/
 apps/mobile/.env
 apps/mobile/.env.local
 .gstack/
+
+# Design and Claude artifacts
+DESIGN.md
+.claude/
+claude-redesign-prompt.txt
+design-preview.html
+production-fix-preview.html
+wireframe-sketch.html
