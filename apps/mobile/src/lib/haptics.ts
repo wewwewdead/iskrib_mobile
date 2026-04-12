@@ -12,7 +12,7 @@ import ReactNativeHapticFeedback, {
 
 const options = {
   enableVibrateFallback: true, // Android vibration fallback
-  ignoreAndroidSystemSettings: false, // Respect system haptic settings
+  ignoreAndroidSystemSettings: true, // Bypass OEM haptic toggle for consistent UX
 };
 
 let reduceMotionEnabled = false;
@@ -73,7 +73,7 @@ export function writingPulseHaptic() {
   trigger(
     Platform.OS === 'ios'
       ? HapticFeedbackTypes.impactMedium
-      : HapticFeedbackTypes.effectClick,
+      : HapticFeedbackTypes.effectDoubleClick,
   );
 }
 

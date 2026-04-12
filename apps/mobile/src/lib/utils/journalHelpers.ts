@@ -210,9 +210,17 @@ export const calculateReadingTime = (text: string): string => {
 const resolveReadingTime = (
   raw: number | string | null | undefined,
   previewText: string,
+  content: string | null | undefined,
 ): string | undefined => {
+  // Use server-provided reading_time if available
   if (typeof raw === 'number' && raw > 0) return formatReadingMinutes(raw);
   if (typeof raw === 'string' && raw.trim() !== '') return raw;
+  // Calculate from full content if available
+  if (content) {
+    const fullText = extractPlainText(content);
+    if (fullText) return calculateReadingTime(fullText);
+  }
+  // Fallback to preview text
   return previewText ? calculateReadingTime(previewText) : undefined;
 };
 
@@ -225,7 +233,7 @@ export const getJournalCardData = (item: JournalCardFields): JournalCardData => 
     likeCount: resolveLikeCount(item),
     commentCount: resolveCount(item.comment_count, item.comments_count),
     bookmarkCount: resolveCount(item.bookmark_count),
-    readingTime: resolveReadingTime(item.reading_time, previewText),
+    readingTime: resolveReadingTime(item.reading_time, previewText, item.content),
   };
 };
 

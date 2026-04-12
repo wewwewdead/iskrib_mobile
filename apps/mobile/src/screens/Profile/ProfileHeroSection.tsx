@@ -108,6 +108,7 @@ export function ProfileHeroSection({
             style={styles.headerBgImage}
             resizeMode="cover"
             accessibilityLabel="Profile header background image"
+            disableFadeIn
           />
           {onSettingsPress && (
             <Pressable

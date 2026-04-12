@@ -13,7 +13,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {PostCard} from '../../components/PostCard/PostCard';
 import {PostCardSkeleton} from '../../components/SkeletonLoader';
-import {ScreenEntrance} from '../../components/ScreenEntrance';
+import {TabRootTransition} from '../../components/TabRootTransition';
 import {CommentModal} from '../../components/Comments';
 import {RepostModal} from '../../components/RepostModal';
 import {SearchInput} from '../../components/SearchInput';
@@ -312,46 +312,47 @@ export function ExploreScreen({navigation}: Props) {
 
   return (
     <SafeAreaView style={[styles.safe, {backgroundColor: colors.bgPrimary}]} edges={['top']}>
-      <ScreenEntrance tier="feed">
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, scaledType.h1, {color: colors.textHeading}]}>Explore</Text>
-          <SearchInput
-            placeholder="Search users or posts..."
-            value={query}
-            onChangeText={setQuery}
-            autoCapitalize="none"
-            returnKeyType="search"
-          />
-        </View>
+      <TabRootTransition style={styles.container}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={[styles.title, scaledType.h1, {color: colors.textHeading}]}>Explore</Text>
+            <SearchInput
+              placeholder="Search users or posts..."
+              value={query}
+              onChangeText={setQuery}
+              autoCapitalize="none"
+              returnKeyType="search"
+            />
+          </View>
 
-        {isSearching ? (
-          <SearchResultsView
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            users={users}
-            journals={journals}
-            normalizedQuery={normalizedQuery}
-            onUserPress={(id, username) =>
-              navigation.navigate('VisitProfile', {userId: id, username})
-            }
-            onPostPress={id =>
-              navigation.navigate('PostDetail', {journalId: id})
-            }
-            onAuthorPress={handleAuthorPress}
-            onReact={handleReact}
-            onComment={handleComment}
-            onBookmark={handleBookmark}
-            onRepost={handleRepost}
-            onEmbeddedPress={id =>
-              navigation.navigate('PostDetail', {journalId: id})
-            }
-          />
-        ) : (
-          renderDefaultView()
-        )}
-      </View>
+          {isSearching ? (
+            <SearchResultsView
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              users={users}
+              journals={journals}
+              normalizedQuery={normalizedQuery}
+              onUserPress={(id, username) =>
+                navigation.navigate('VisitProfile', {userId: id, username})
+              }
+              onPostPress={id =>
+                navigation.navigate('PostDetail', {journalId: id})
+              }
+              onAuthorPress={handleAuthorPress}
+              onReact={handleReact}
+              onComment={handleComment}
+              onBookmark={handleBookmark}
+              onRepost={handleRepost}
+              onEmbeddedPress={id =>
+                navigation.navigate('PostDetail', {journalId: id})
+              }
+            />
+          ) : (
+            renderDefaultView()
+          )}
+        </View>
+      </TabRootTransition>
 
       {/* Peek modal — null-guarded internally. One instance for every
           InterestSection on this screen. runnerRow items are tap-only
@@ -387,7 +388,6 @@ export function ExploreScreen({navigation}: Props) {
           onClose={() => setRepostModal(null)}
         />
       )}
-      </ScreenEntrance>
     </SafeAreaView>
   );
 }

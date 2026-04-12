@@ -42,7 +42,34 @@ interface UsePresenceResult {
 const CHANNEL_NAME = 'presence:writing';
 const BROADCAST_DEBOUNCE_MS = 5000;
 
-export function usePresence(): UsePresenceResult {
+interface UsePresenceOptions {
+  enabled?: boolean;
+}
+
+function areUsersEqual(a: PresenceUser[], b: PresenceUser[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  for (let index = 0; index < a.length; index += 1) {
+    const current = a[index];
+    const next = b[index];
+
+    if (
+      current.userId !== next.userId ||
+      current.username !== next.username ||
+      current.avatarUrl !== next.avatarUrl
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function usePresence({
+  enabled = true,
+}: UsePresenceOptions = {}): UsePresenceResult {
   const {session} = useAuth();
   const [usersWritingNow, setUsersWritingNow] = useState<PresenceUser[]>([]);
   const [isUserWriting, setIsUserWriting] = useState(false);
@@ -55,23 +82,32 @@ export function usePresence(): UsePresenceResult {
 
   // Track app state to pause presence when backgrounded
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     const handleAppState = (state: AppStateStatus) => {
       if (state !== 'active' && channelRef.current && isUserWriting) {
         // App backgrounded — stop broadcasting
         channelRef.current.untrack();
         setIsUserWriting(false);
+        if (broadcastTimerRef.current) {
+          clearTimeout(broadcastTimerRef.current);
+          broadcastTimerRef.current = null;
+        }
       }
     };
 
     const sub = AppState.addEventListener('change', handleAppState);
     return () => sub.remove();
-  }, [isUserWriting]);
+  }, [enabled, isUserWriting]);
 
   // Set up presence channel
   useEffect(() => {
-    if (!session?.user || !supabase) {
+    if (!enabled || !session?.user || !supabase) {
       setConnectionState('disconnected');
       setUsersWritingNow([]);
+      setIsUserWriting(false);
       return;
     }
 
@@ -102,7 +138,11 @@ export function usePresence(): UsePresenceResult {
           }
         }
 
-        setUsersWritingNow(users);
+        users.sort((left, right) => left.userId.localeCompare(right.userId));
+
+        setUsersWritingNow(previous =>
+          areUsersEqual(previous, users) ? previous : users,
+        );
       })
       .subscribe((status: string) => {
         if (status === 'SUBSCRIBED') {
@@ -120,14 +160,16 @@ export function usePresence(): UsePresenceResult {
       channelRef.current = null;
       setConnectionState('disconnected');
       setUsersWritingNow([]);
+      setIsUserWriting(false);
       if (broadcastTimerRef.current) {
         clearTimeout(broadcastTimerRef.current);
+        broadcastTimerRef.current = null;
       }
     };
-  }, [session?.user]);
+  }, [enabled, session?.user]);
 
   const startWriting = useCallback(() => {
-    if (!channelRef.current || !session?.user || isUserWriting) {
+    if (!enabled || !channelRef.current || !session?.user || isUserWriting) {
       return;
     }
 
@@ -153,7 +195,7 @@ export function usePresence(): UsePresenceResult {
       username: session.user.user_metadata?.username || 'Unknown',
       avatar_url: session.user.user_metadata?.avatar_url || null,
     });
-  }, [session?.user, isUserWriting]);
+  }, [enabled, session?.user, isUserWriting]);
 
   const stopWriting = useCallback(() => {
     if (!channelRef.current || !isUserWriting) {

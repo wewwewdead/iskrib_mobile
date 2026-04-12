@@ -47,7 +47,6 @@ export function ProfileWritingsTab({userId, headerComponent}: ProfileWritingsTab
         : mobileApi.getVisitedUserJournals(userId, user?.id ?? '', pageParam ?? null, PAGE_SIZE),
     initialPageParam: null as string | null,
     getNextPageParam: lastPage => getNextCursor(lastPage, PAGE_SIZE),
-    maxPages: 4,
   });
 
   const queryKey = ['profileWritings', userId];

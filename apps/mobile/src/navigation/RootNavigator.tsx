@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {ActivityIndicator, Animated, Easing, StyleSheet, Text, View} from 'react-native';
-import {enableScreens} from 'react-native-screens';
+import {enableFreeze, enableScreens} from 'react-native-screens';
 import {
   NavigationContainer,
   DarkTheme,
@@ -18,6 +18,7 @@ import {
 } from '../lib/navigationAnimation';
 
 enableScreens();
+enableFreeze();
 import {useQuery} from '@tanstack/react-query';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {useAuth} from '../features/auth/AuthProvider';
@@ -234,11 +235,14 @@ function MainTabNavigator() {
     queryKey: ['notification-count', userId],
     enabled: Boolean(userId),
     queryFn: () => socialApi.getNotificationsCount(userId),
+    staleTime: 60 * 1000,
+    refetchOnMount: false,
   });
   const unreadCount = countData?.count ?? 0;
 
   return (
     <MainTabs.Navigator
+      detachInactiveScreens={false}
       screenOptions={{
         headerStyle: {backgroundColor: colors.bgPrimary},
         headerTintColor: colors.textPrimary,
@@ -255,7 +259,8 @@ function MainTabNavigator() {
           fontSize: 11,
           fontFamily: fonts.ui.semiBold,
         },
-        animation: 'fade',
+        animation: 'none',
+        freezeOnBlur: true,
       }}>
       <MainTabs.Screen
         name="Home"
@@ -347,6 +352,8 @@ function LoggedInShell({children}: {children: React.ReactNode}) {
     queryFn: () => mobileApi.checkUser(userId ?? ''),
     retry: 1,
     retryDelay: 750,
+    staleTime: 10 * 60 * 1000,
+    refetchOnMount: false,
   });
 
   const needsOnboarding =

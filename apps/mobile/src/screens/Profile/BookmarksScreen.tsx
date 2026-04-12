@@ -27,7 +27,6 @@ export function BookmarksScreen({navigation}: Props) {
       if (!lastPage?.hasMore || !lastPage.bookmarks?.length) return undefined;
       return lastPage.bookmarks[lastPage.bookmarks.length - 1]?.created_at;
     },
-    maxPages: 4,
   });
 
   const bookmarks = useMemo(

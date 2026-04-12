@@ -1,23 +1,33 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   FlatList,
   StyleSheet,
   Text,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import {useInfiniteQuery, useMutation, useQuery} from '@tanstack/react-query';
 import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
-import {CompositeScreenProps} from '@react-navigation/native';
+import {CompositeScreenProps, useIsFocused} from '@react-navigation/native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {PostCard} from '../../components/PostCard/PostCard';
 import {PostCardSkeleton} from '../../components/SkeletonLoader';
-import {ScreenEntrance} from '../../components/ScreenEntrance';
+import {TabRootTransition} from '../../components/TabRootTransition';
 import {CommentModal} from '../../components/Comments';
 import {RepostModal} from '../../components/RepostModal';
 import {PeekModal} from '../../components/PeekModal/PeekModal';
 import {PeekHint} from '../../components/PeekModal/PeekHint';
-import {usePeekModal} from '../../hooks/usePeekModal';
+import {
+  usePeekModal,
+  type PeekSourceRect,
+} from '../../hooks/usePeekModal';
 import {SearchInput} from '../../components/SearchInput';
 import {SearchResultsView} from '../../components/SearchResultsView';
 import {FeedTabBar, type FeedTab} from '../../components/FeedTabBar';
@@ -58,24 +68,164 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
+type HomeFeedPostCardProps = {
+  item: JournalItem;
+  onAuthorPress: (item: JournalItem) => void;
+  onBookmark: (journalId: string) => void;
+  onComment: (journalId: string, receiverId?: string, commentCount?: number) => void;
+  onOpenPost: (journalId: string) => void;
+  onPeek: (item: JournalItem, sourceRect?: PeekSourceRect) => void;
+  onReact: (journalId: string, receiverId: string, reactionType: string) => void;
+  onRepost: (
+    journalId: string,
+    title?: string,
+    authorName?: string,
+    authorAvatar?: string,
+  ) => void;
+  reactionError: boolean;
+};
+
 const PAGE_SIZE = 10;
+// No maxPages cap — FlatList already virtualizes off-screen items so memory is bounded
+
+const FeedSeparator = React.memo(function FeedSeparator() {
+  return <View style={styles.separator} />;
+});
+
+const HomeFeedPostCard = React.memo(function HomeFeedPostCard({
+  item,
+  onAuthorPress,
+  onBookmark,
+  onComment,
+  onOpenPost,
+  onPeek,
+  onReact,
+  onRepost,
+  reactionError,
+}: HomeFeedPostCardProps) {
+  const cardData = getJournalCardData(item);
+  const receiverId = item.user_id ?? item.users?.id ?? '';
+  const isRepost = !!item.is_repost;
+  const repostSource = isRepost ? item.repost_source : null;
+  const repostSourcePreview = repostSource?.preview_text || '';
+
+  const handleReact = useCallback(
+    (type: string) => {
+      onReact(item.id, receiverId, type);
+    },
+    [item.id, onReact, receiverId],
+  );
+
+  const handleComment = useCallback(() => {
+    onComment(item.id, receiverId, cardData.commentCount);
+  }, [cardData.commentCount, item.id, onComment, receiverId]);
+
+  const handleBookmark = useCallback(() => {
+    onBookmark(item.id);
+  }, [item.id, onBookmark]);
+
+  const handleRepost = useCallback(() => {
+    onRepost(
+      item.id,
+      item.title ?? undefined,
+      item.users?.name ?? undefined,
+      item.users?.image_url ?? undefined,
+    );
+  }, [item.id, item.title, item.users?.image_url, item.users?.name, onRepost]);
+
+  const handleOpenPost = useCallback(() => {
+    onOpenPost(item.id);
+  }, [item.id, onOpenPost]);
+
+  const handlePeek = useCallback(
+    (sourceRect?: PeekSourceRect) => {
+      onPeek(item, sourceRect);
+    },
+    [item, onPeek],
+  );
+
+  const handleAuthorOpen = useCallback(() => {
+    onAuthorPress(item);
+  }, [item, onAuthorPress]);
+
+  const handleOpenEmbedded = useCallback(() => {
+    if (repostSource) {
+      onOpenPost(repostSource.id);
+    }
+  }, [onOpenPost, repostSource]);
+
+  return (
+    <PostCard
+      title={item.title || 'Untitled Post'}
+      bodyPreview={cardData.previewText || 'No preview text available.'}
+      authorName={item.users?.name || 'Unknown author'}
+      authorAvatar={item.users?.image_url}
+      authorBadge={item.users?.badge as 'legend' | 'og' | undefined}
+      bannerImage={cardData.bannerImage}
+      postType={item.post_type ?? undefined}
+      readingTime={cardData.readingTime}
+      likeCount={cardData.likeCount}
+      commentCount={cardData.commentCount}
+      bookmarkCount={cardData.bookmarkCount}
+      viewCount={item.views}
+      userReaction={item.user_reaction}
+      isBookmarked={!!item.has_bookmarked}
+      onReact={handleReact}
+      reactionError={reactionError}
+      onComment={handleComment}
+      onBookmark={handleBookmark}
+      onRepost={handleRepost}
+      onPress={handleOpenPost}
+      onLongPress={handlePeek}
+      shareId={item.id}
+      onAuthorPress={handleAuthorOpen}
+      isRepost={isRepost}
+      repostCaption={item.repost_caption}
+      repostSourceTitle={repostSource?.title}
+      repostSourcePreview={repostSourcePreview}
+      repostSourceAuthorName={repostSource?.users?.name}
+      repostSourceAuthorAvatar={repostSource?.users?.image_url}
+      promptId={item.prompt_id}
+      promptText={item.writing_prompts?.prompt_text}
+      onEmbeddedPress={repostSource ? handleOpenEmbedded : undefined}
+    />
+  );
+});
 
 export function HomeFeedScreen({navigation}: Props) {
   const {user} = useAuth();
   const {colors} = useTheme();
+  const isFocused = useIsFocused();
   const [refreshing, setRefreshing] = useState(false);
   const [feedTab, setFeedTab] = useState<FeedTab>('all');
-  const [commentModal, setCommentModal] = useState<{postId: string; receiverId?: string; commentCount: number} | null>(null);
-  const [repostModal, setRepostModal] = useState<{journalId: string; title?: string; authorName?: string; authorAvatar?: string} | null>(null);
+  const [commentModal, setCommentModal] = useState<{
+    postId: string;
+    receiverId?: string;
+    commentCount: number;
+  } | null>(null);
+  const [repostModal, setRepostModal] = useState<{
+    journalId: string;
+    title?: string;
+    authorName?: string;
+    authorAvatar?: string;
+  } | null>(null);
   const [showRecap, setShowRecap] = useState(false);
   const [recapData, setRecapData] = useState<WeeklyRecapData | null>(null);
-  const {query, setQuery, activeTab, setActiveTab, isSearching, normalizedQuery, users, journals} = useSearch();
-  const {usersWritingNow} = usePresence();
-  const flatListRef = useRef<FlatList>(null);
+  const {
+    query,
+    setQuery,
+    activeTab,
+    setActiveTab,
+    isSearching,
+    normalizedQuery,
+    users,
+    journals,
+  } = useSearch();
+  const {usersWritingNow} = usePresence({
+    enabled: isFocused && !isSearching,
+  });
+  const flatListRef = useRef<FlatList<JournalItem>>(null);
 
-  // Peek modal state. Per-screen hook (not shared via Context). Stacked-
-  // modal guard passes the latest commentModal/repostModal state every
-  // render so the hook's internal ref reads the current value.
   const {peekPost, peekSourceRect, openPeek, closePeek} = usePeekModal({
     isOtherModalOpen: !!commentModal || !!repostModal,
   });
@@ -93,6 +243,7 @@ export function HomeFeedScreen({navigation}: Props) {
     queryKey: ['weekly-recap'],
     queryFn: () => analyticsApi.getWeeklyRecap(),
     staleTime: 60 * 60 * 1000,
+    refetchOnMount: false,
   });
 
   const streakQuery = useQuery({
@@ -100,6 +251,7 @@ export function HomeFeedScreen({navigation}: Props) {
     queryFn: () => mobileApi.getStreak(user?.id ?? ''),
     enabled: !!user?.id,
     staleTime: 60 * 60 * 1000,
+    refetchOnMount: false,
   });
 
   useEffect(() => {
@@ -137,7 +289,12 @@ export function HomeFeedScreen({navigation}: Props) {
       getNextOffset(lastPage, (lastPageParam as number) ?? 0, PAGE_SIZE),
   });
 
-  const activeQuery = feedTab === 'following' ? followingQuery : feedTab === 'foryou' ? forYouQuery : feedQuery;
+  const activeQuery =
+    feedTab === 'following'
+      ? followingQuery
+      : feedTab === 'foryou'
+        ? forYouQuery
+        : feedQuery;
 
   const reactionMutation = useMutation({
     mutationFn: async ({
@@ -199,10 +356,10 @@ export function HomeFeedScreen({navigation}: Props) {
     },
   });
 
-  // Track which post had a reaction error (for shake animation)
-  const [reactionErrorPostId, setReactionErrorPostId] = useState<string | null>(null);
+  const [reactionErrorPostId, setReactionErrorPostId] = useState<string | null>(
+    null,
+  );
 
-  // Clear reaction error after animation plays
   useEffect(() => {
     if (reactionErrorPostId) {
       const timer = setTimeout(() => setReactionErrorPostId(null), 500);
@@ -212,34 +369,96 @@ export function HomeFeedScreen({navigation}: Props) {
 
   const bookmarkMutation = useBookmarkMutation(['feed', user?.id]);
 
-  const handleReact = (journalId: string, receiverId: string, reactionType: string) => {
-    reactionMutation.mutate({journalId, receiverId, reactionType});
-  };
+  const handleReact = useCallback(
+    (journalId: string, receiverId: string, reactionType: string) => {
+      reactionMutation.mutate({journalId, receiverId, reactionType});
+    },
+    [reactionMutation],
+  );
 
-  const handleComment = (journalId: string, receiverId?: string, commentCount?: number) => {
-    setCommentModal({postId: journalId, receiverId, commentCount: commentCount ?? 0});
-  };
+  const handleComment = useCallback(
+    (journalId: string, receiverId?: string, commentCount?: number) => {
+      setCommentModal({
+        postId: journalId,
+        receiverId,
+        commentCount: commentCount ?? 0,
+      });
+    },
+    [],
+  );
 
-  const handleBookmark = (journalId: string) => {
-    bookmarkMutation.mutate(journalId);
-  };
+  const handleBookmark = useCallback(
+    (journalId: string) => {
+      bookmarkMutation.mutate(journalId);
+    },
+    [bookmarkMutation],
+  );
 
-  const handleRepost = (journalId: string, title?: string, authorName?: string, authorAvatar?: string) => {
-    setRepostModal({journalId, title, authorName, authorAvatar});
-  };
+  const handleRepost = useCallback(
+    (
+      journalId: string,
+      title?: string,
+      authorName?: string,
+      authorAvatar?: string,
+    ) => {
+      setRepostModal({journalId, title, authorName, authorAvatar});
+    },
+    [],
+  );
 
-  const handleAuthorPress = (item: JournalItem) => {
-    const authorId = item.users?.id ?? item.user_id;
-    if (!authorId) return;
-    if (authorId === user?.id) {
-      navigation.navigate('Main', {screen: 'Profile'} as any);
-    } else {
+  const handleOpenPost = useCallback(
+    (journalId: string) => {
+      navigation.navigate('PostDetail', {journalId});
+    },
+    [navigation],
+  );
+
+  const handleOpenOpinions = useCallback(() => {
+    navigation.navigate('OpinionsFeed');
+  }, [navigation]);
+
+  const handleWritePrompt = useCallback(
+    (promptId: string, promptText: string) => {
+      navigation.navigate('JournalEditor', {mode: 'create', promptId, promptText});
+    },
+    [navigation],
+  );
+
+  const handleOpenComposer = useCallback(() => {
+    navigation.navigate('JournalEditor', {mode: 'create'});
+  }, [navigation]);
+
+  const handleVisitProfile = useCallback(
+    (userId: string, username?: string) => {
+      navigation.navigate('VisitProfile', {userId, username});
+    },
+    [navigation],
+  );
+
+  const handlePresenceUserPress = useCallback(
+    (userId: string) => {
+      navigation.navigate('VisitProfile', {userId});
+    },
+    [navigation],
+  );
+
+  const handleAuthorPress = useCallback(
+    (item: JournalItem) => {
+      const authorId = item.users?.id ?? item.user_id;
+      if (!authorId) return;
+
+      if (authorId === user?.id) {
+        navigation.navigate('Main', {screen: 'Profile'} as any);
+        return;
+      }
+
       navigation.navigate('VisitProfile', {
         userId: authorId,
         username: item.users?.username ?? undefined,
       });
-    }
-  };
+    },
+    [navigation, user?.id],
+  );
 
   const posts = useMemo(
     () =>
@@ -249,196 +468,197 @@ export function HomeFeedScreen({navigation}: Props) {
     [activeQuery.data?.pages],
   );
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await activeQuery.refetch();
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [activeQuery]);
+
+  const handleEndReached = useCallback(() => {
+    if (activeQuery.hasNextPage && !activeQuery.isFetchingNextPage) {
+      activeQuery.fetchNextPage();
+    }
+  }, [activeQuery]);
+
+  const listHeader = useMemo(
+    () => (
+      <>
+        {feedTab === 'all' ? <PeekHint /> : null}
+        {feedTab === 'all' ? (
+          <DailyPromptCard onWrite={handleWritePrompt} />
+        ) : null}
+        {feedTab === 'all' && recapQuery.data?.recap ? (
+          <WeeklyRecapCard
+            recap={recapQuery.data.recap}
+            onNavigateToPost={handleOpenPost}
+            onNavigateToProfile={handleVisitProfile}
+          />
+        ) : null}
+        <WritingPresenceBar
+          users={usersWritingNow}
+          onUserPress={handlePresenceUserPress}
+        />
+      </>
+    ),
+    [
+      feedTab,
+      handleOpenPost,
+      handlePresenceUserPress,
+      handleVisitProfile,
+      handleWritePrompt,
+      recapQuery.data?.recap,
+      usersWritingNow,
+    ],
+  );
+
+  const listEmptyComponent = useMemo(() => {
+    if (activeQuery.isLoading) {
+      return (
+        <View style={styles.skeletonList}>
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+          <PostCardSkeleton />
+        </View>
+      );
+    }
+
+    return (
+      <EmptyState
+        title={
+          feedTab === 'following'
+            ? 'No posts from people you follow'
+            : feedTab === 'foryou'
+              ? 'No recommendations yet'
+              : 'No posts yet'
+        }
+        subtitle={
+          feedTab === 'following'
+            ? 'Follow writers to see their posts here.'
+            : 'Pull to refresh or create your first journal post.'
+        }
+      />
+    );
+  }, [activeQuery.isLoading, feedTab]);
+
+  const listFooterComponent = useMemo(
+    () =>
+      activeQuery.isFetchingNextPage ? (
+        <View style={styles.loadingMore}>
+          <PostCardSkeleton />
+        </View>
+      ) : null,
+    [activeQuery.isFetchingNextPage],
+  );
+
+  const renderPostItem = useCallback(
+    ({item}: ListRenderItemInfo<JournalItem>) => (
+      <HomeFeedPostCard
+        item={item}
+        onAuthorPress={handleAuthorPress}
+        onBookmark={handleBookmark}
+        onComment={handleComment}
+        onOpenPost={handleOpenPost}
+        onPeek={openPeek}
+        onReact={handleReact}
+        onRepost={handleRepost}
+        reactionError={reactionErrorPostId === item.id}
+      />
+    ),
+    [
+      handleAuthorPress,
+      handleBookmark,
+      handleComment,
+      handleOpenPost,
+      handleReact,
+      handleRepost,
+      openPeek,
+      reactionErrorPostId,
+    ],
+  );
 
   return (
     <SafeAreaView
       style={[styles.safe, {backgroundColor: colors.bgPrimary}]}
       edges={['top']}>
-      <ScreenEntrance tier="feed">
-      {/* Branded header */}
-      <View
-        style={[
-          styles.header,
-          {borderBottomColor: colors.borderCard},
-        ]}>
-        <View style={styles.brandRow}>
-          <Text style={[styles.brandText, {color: colors.textHeading}]}>
-            iskrib
-          </Text>
-          <Chip
-            label="Opinions"
-            active
-            onPress={() => navigation.navigate('OpinionsFeed')}
+      <TabRootTransition style={styles.content}>
+        <View
+          style={[
+            styles.header,
+            {borderBottomColor: colors.borderCard},
+          ]}>
+          <View style={styles.brandRow}>
+            <Text style={[styles.brandText, {color: colors.textHeading}]}>
+              iskrib
+            </Text>
+            <Chip
+              label="Opinions"
+              active
+              onPress={handleOpenOpinions}
+            />
+          </View>
+          <SearchInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search users or posts..."
+            autoCapitalize="none"
+            returnKeyType="search"
           />
         </View>
-        <SearchInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search users or posts..."
-          autoCapitalize="none"
-          returnKeyType="search"
-        />
-      </View>
 
-      {isSearching ? (
-        <SearchResultsView
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          users={users}
-          journals={journals}
-          normalizedQuery={normalizedQuery}
-          onUserPress={(id, username) =>
-            navigation.navigate('VisitProfile', {userId: id, username})
-          }
-          onPostPress={id =>
-            navigation.navigate('PostDetail', {journalId: id})
-          }
-          onAuthorPress={handleAuthorPress}
-          onReact={handleReact}
-          onComment={handleComment}
-          onBookmark={handleBookmark}
-          onRepost={handleRepost}
-          onEmbeddedPress={id =>
-            navigation.navigate('PostDetail', {journalId: id})
-          }
-        />
-      ) : (
-        <>
-          {/* Feed tab bar */}
-          <FeedTabBar activeTab={feedTab} onTabChange={setFeedTab} />
-
-          {/* Feed */}
-          <FlatList
-            ref={flatListRef}
-            data={posts}
-            {...VERTICAL_CARD_LIST_PROPS}
-            onRefresh={onRefresh}
-            refreshing={refreshing}
-            onEndReachedThreshold={0.25}
-            onEndReached={() => {
-              if (activeQuery.hasNextPage && !activeQuery.isFetchingNextPage) {
-                activeQuery.fetchNextPage();
-              }
-            }}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ListHeaderComponent={
-              <>
-                {feedTab === 'all' ? <PeekHint /> : null}
-                {feedTab === 'all' ? <DailyPromptCard onWrite={(promptId, promptText) => navigation.navigate('JournalEditor', {mode: 'create', promptId, promptText})} /> : null}
-                {feedTab === 'all' && recapQuery.data?.recap && (
-                  <WeeklyRecapCard
-                    recap={recapQuery.data.recap}
-                    onNavigateToPost={(journalId) =>
-                      navigation.navigate('PostDetail', {journalId})
-                    }
-                    onNavigateToProfile={(userId, username) =>
-                      navigation.navigate('VisitProfile', {userId, username})
-                    }
-                  />
-                )}
-                <WritingPresenceBar
-                  users={usersWritingNow}
-                  onUserPress={userId =>
-                    navigation.navigate('VisitProfile', {userId})
-                  }
-                />
-              </>
-            }
-            ListEmptyComponent={
-              activeQuery.isLoading ? (
-                <View style={styles.skeletonList}>
-                  <PostCardSkeleton />
-                  <PostCardSkeleton />
-                  <PostCardSkeleton />
-                </View>
-              ) : (
-                <EmptyState
-                  title={feedTab === 'following' ? 'No posts from people you follow' : feedTab === 'foryou' ? 'No recommendations yet' : 'No posts yet'}
-                  subtitle={feedTab === 'following' ? 'Follow writers to see their posts here.' : 'Pull to refresh or create your first journal post.'}
-                />
-              )
-            }
-            ListFooterComponent={
-              activeQuery.isFetchingNextPage ? (
-                <View style={styles.loadingMore}>
-                  <PostCardSkeleton />
-                </View>
-              ) : null
-            }
-            keyExtractor={item => item.id}
-            renderItem={({item}) => {
-              const cardData = getJournalCardData(item);
-
-              const receiverId = item.user_id ?? item.users?.id ?? '';
-
-              const isRepost = !!item.is_repost;
-              const repostSource = isRepost ? item.repost_source : null;
-              const repostSourcePreview = repostSource?.preview_text || '';
-
-              return (
-                <PostCard
-                  title={item.title || 'Untitled Post'}
-                  bodyPreview={cardData.previewText || 'No preview text available.'}
-                  authorName={item.users?.name || 'Unknown author'}
-                  authorAvatar={item.users?.image_url}
-                  authorBadge={item.users?.badge as 'legend' | 'og' | undefined}
-                  bannerImage={cardData.bannerImage}
-                  postType={item.post_type ?? undefined}
-                  readingTime={cardData.readingTime}
-                  likeCount={cardData.likeCount}
-                  commentCount={cardData.commentCount}
-                  bookmarkCount={cardData.bookmarkCount}
-                  viewCount={item.views}
-                  userReaction={item.user_reaction}
-                  isBookmarked={!!item.has_bookmarked}
-                  onReact={type => handleReact(item.id, receiverId, type)}
-                  reactionError={reactionErrorPostId === item.id}
-                  onComment={() => handleComment(item.id, receiverId, cardData.commentCount)}
-                  onBookmark={() => handleBookmark(item.id)}
-                  onRepost={() => handleRepost(item.id, item.title ?? undefined, item.users?.name ?? undefined, item.users?.image_url ?? undefined)}
-                  onPress={() =>
-                    navigation.navigate('PostDetail', {journalId: item.id})
-                  }
-                  onLongPress={rect => openPeek(item, rect)}
-                  shareId={item.id}
-                  onAuthorPress={() => handleAuthorPress(item)}
-                  isRepost={isRepost}
-                  repostCaption={item.repost_caption}
-                  repostSourceTitle={repostSource?.title}
-                  repostSourcePreview={repostSourcePreview}
-                  repostSourceAuthorName={repostSource?.users?.name}
-                  repostSourceAuthorAvatar={repostSource?.users?.image_url}
-                  promptId={item.prompt_id}
-                  promptText={item.writing_prompts?.prompt_text}
-                  onEmbeddedPress={repostSource ? () => navigation.navigate('PostDetail', {journalId: repostSource.id}) : undefined}
-                />
-              );
-            }}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
+        {isSearching ? (
+          <SearchResultsView
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            users={users}
+            journals={journals}
+            normalizedQuery={normalizedQuery}
+            onUserPress={handleVisitProfile}
+            onPostPress={handleOpenPost}
+            onAuthorPress={handleAuthorPress}
+            onReact={handleReact}
+            onComment={handleComment}
+            onBookmark={handleBookmark}
+            onRepost={handleRepost}
+            onEmbeddedPress={handleOpenPost}
           />
-        </>
-      )}
+        ) : (
+          <>
+            <FeedTabBar activeTab={feedTab} onTabChange={setFeedTab} />
 
-      {/* Peek modal — rendered unconditionally, internal null-guard handles
-          the visible state. onOpenFull fires navigate FIRST then dismisses
-          the peek in the same frame so the nav push masks the modal close
-          (one fluid motion per the CEO plan cherry-pick #4). sourceRect
-          lets the entry animation anchor on the long-pressed card. */}
+            <FlatList
+              ref={flatListRef}
+              data={posts}
+              {...VERTICAL_CARD_LIST_PROPS}
+              onRefresh={onRefresh}
+              refreshing={refreshing}
+              onEndReachedThreshold={0.25}
+              onEndReached={handleEndReached}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              ListHeaderComponent={listHeader}
+              ListEmptyComponent={listEmptyComponent}
+              ListFooterComponent={listFooterComponent}
+              keyExtractor={item => item.id}
+              renderItem={renderPostItem}
+              ItemSeparatorComponent={FeedSeparator}
+            />
+          </>
+        )}
+
+        <SpringFAB onPress={handleOpenComposer}>
+          <PenIcon size={22} color={colors.textOnAccent} />
+        </SpringFAB>
+      </TabRootTransition>
+
       <PeekModal
         post={peekPost}
         sourceRect={peekSourceRect}
         onClose={closePeek}
         onOpenFull={id => {
-          navigation.navigate('PostDetail', {journalId: id});
+          handleOpenPost(id);
           closePeek();
         }}
       />
@@ -470,28 +690,26 @@ export function HomeFeedScreen({navigation}: Props) {
           recap={recapData}
           streakCount={streakQuery.data?.currentStreak ?? 0}
           onDismiss={() => setShowRecap(false)}
-          onNavigateToPost={(journalId) => {
+          onNavigateToPost={journalId => {
             setShowRecap(false);
-            navigation.navigate('PostDetail', {journalId});
+            handleOpenPost(journalId);
           }}
           onNavigateToProfile={(userId, username) => {
             setShowRecap(false);
-            navigation.navigate('VisitProfile', {userId, username});
+            handleVisitProfile(userId, username);
           }}
         />
       )}
 
-      {/* FAB Write Button — breathing + spring press */}
-      <SpringFAB onPress={() => navigation.navigate('JournalEditor', {mode: 'create'})}>
-        <PenIcon size={22} color={colors.textOnAccent} />
-      </SpringFAB>
-      </ScreenEntrance>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
+    flex: 1,
+  },
+  content: {
     flex: 1,
   },
   header: {

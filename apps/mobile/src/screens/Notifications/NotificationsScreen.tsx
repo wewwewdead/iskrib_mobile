@@ -14,6 +14,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Avatar} from '../../components/Avatar';
 import {EmptyState} from '../../components/EmptyState';
+import {TabRootTransition} from '../../components/TabRootTransition';
 import {BellIcon, HeartIcon, CommentIcon, RepostIcon, UserIcon, ReplyIcon} from '../../components/icons';
 import {useAuth} from '../../features/auth/AuthProvider';
 import {useTheme} from '../../theme/ThemeProvider';
@@ -108,6 +109,7 @@ export function NotificationsScreen({navigation}: Props) {
     enabled: Boolean(userId),
     queryFn: () => mobileApi.getUserData(userId),
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: false,
   });
   const myProfile = myProfileQuery.data?.userData?.[0];
 
@@ -121,6 +123,8 @@ export function NotificationsScreen({navigation}: Props) {
     queryKey: ['notification-count', userId],
     enabled: Boolean(isLoggedIn && userId),
     queryFn: () => socialApi.getNotificationsCount(userId),
+    staleTime: 60 * 1000,
+    refetchOnMount: false,
   });
 
   const markReadMutation = useMutation({
@@ -231,47 +235,52 @@ export function NotificationsScreen({navigation}: Props) {
 
   return (
     <SafeAreaView style={[styles.safe, {backgroundColor: colors.bgPrimary}]} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={[styles.title, scaledType.h1, {color: colors.textHeading}]}>
-          Notifications
-        </Text>
-        {unreadCount > 0 && (
-          <View style={[styles.countBadge, {backgroundColor: colors.accentAmber}]}>
-            <Text style={[styles.countText, {color: colors.textOnAccent}]}>{unreadCount}</Text>
-          </View>
-        )}
-      </View>
-
-      {!isLoggedIn ? (
-        <EmptyState title="Sign in" subtitle="Log in to see your notifications" />
-      ) : notificationsQuery.isLoading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator color={colors.loaderColor} />
+      <TabRootTransition style={styles.content}>
+        <View style={styles.header}>
+          <Text style={[styles.title, scaledType.h1, {color: colors.textHeading}]}>
+            Notifications
+          </Text>
+          {unreadCount > 0 && (
+            <View style={[styles.countBadge, {backgroundColor: colors.accentAmber}]}>
+              <Text style={[styles.countText, {color: colors.textOnAccent}]}>{unreadCount}</Text>
+            </View>
+          )}
         </View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={item => item.id}
-          renderItem={renderItem}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          onRefresh={() => notificationsQuery.refetch()}
-          refreshing={false}
-          ListEmptyComponent={
-            <EmptyState
-              icon={<BellIcon size={36} color={colors.textFaint} />}
-              title="All caught up"
-              subtitle="No notifications yet"
-            />
-          }
-        />
-      )}
+
+        {!isLoggedIn ? (
+          <EmptyState title="Sign in" subtitle="Log in to see your notifications" />
+        ) : notificationsQuery.isLoading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator color={colors.loaderColor} />
+          </View>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={item => item.id}
+            renderItem={renderItem}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            onRefresh={() => notificationsQuery.refetch()}
+            refreshing={false}
+            ListEmptyComponent={
+              <EmptyState
+                icon={<BellIcon size={36} color={colors.textFaint} />}
+                title="All caught up"
+                subtitle="No notifications yet"
+              />
+            }
+          />
+        )}
+      </TabRootTransition>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
+    flex: 1,
+  },
+  content: {
     flex: 1,
   },
   header: {

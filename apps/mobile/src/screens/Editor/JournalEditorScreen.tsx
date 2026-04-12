@@ -32,16 +32,19 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import {AtmosphereLayer} from '../../components/AtmosphereLayer';
 import {EditorToolbar} from '../../components/EditorToolbar';
 import {LinkInsertModal} from '../../components/LinkInsertModal';
 import {ReadingTimeBar} from '../../components/ReadingTimeBar';
 import {SaveIndicator} from '../../components/SaveIndicator';
 import {Toast} from '../../components/Toast';
 import {
+  FireIcon,
   LightbulbIcon,
   LockIcon,
   UnlockIcon,
 } from '../../components/icons';
+import {useFlowAtmosphere} from '../../hooks/useFlowAtmosphere';
 import {mobileApi} from '../../lib/api/mobileApi';
 import {htmlToLexicalJson, lexicalToHtml, stripHtmlToPlainText} from '../../lib/content/htmlToLexical';
 import {emitGlobalToast} from '../../lib/globalToast';
@@ -241,6 +244,7 @@ export function JournalEditorScreen({navigation, route}: Props) {
   const {colors, isDark} = useTheme();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
+  const {warmth, flowLevel, enabled: atmosphereEnabled, toggleEnabled: toggleAtmosphere, reportTypingEvent} = useFlowAtmosphere();
   const editorRef = useRef<RichEditor>(null);
   const didSaveRef = useRef(false);
   const htmlRef = useRef('');
@@ -438,6 +442,9 @@ export function JournalEditorScreen({navigation, route}: Props) {
     setHtml(newHtml);
     htmlRef.current = newHtml;
 
+    // Feed typing events to the atmosphere engine (plain text length, not HTML)
+    reportTypingEvent(stripHtmlToPlainText(newHtml).length);
+
     if (wordCountTimerRef.current) {
       clearTimeout(wordCountTimerRef.current);
     }
@@ -447,7 +454,7 @@ export function JournalEditorScreen({navigation, route}: Props) {
     }, WORD_COUNT_DEBOUNCE_MS);
 
     queueSaveIndicator();
-  }, [queueSaveIndicator, syncWordCount]);
+  }, [queueSaveIndicator, reportTypingEvent, syncWordCount]);
 
   const handleTitleChange = useCallback((newTitle: string) => {
     setTitle(newTitle);
@@ -530,7 +537,7 @@ export function JournalEditorScreen({navigation, route}: Props) {
     contentCSSText: `
       font-size: 16px;
       line-height: 1.7;
-      padding-bottom: 24px;
+      padding-bottom: 120px;
       h1 { font-size: 28px; font-weight: 700; margin: 16px 0 8px; }
       h2 { font-size: 22px; font-weight: 700; margin: 12px 0 6px; }
       h3 { font-size: 18px; font-weight: 700; margin: 8px 0 4px; }
@@ -821,16 +828,23 @@ export function JournalEditorScreen({navigation, route}: Props) {
 
   return (
     <SafeAreaView
-      style={[styles.safe, {backgroundColor: colors.bgPrimary}]}
+      style={[styles.safe, {backgroundColor: atmosphereEnabled ? 'transparent' : colors.bgPrimary}]}
       edges={['top', 'left', 'right']}>
+      <AtmosphereLayer warmth={warmth} flowLevel={flowLevel} enabled={atmosphereEnabled} />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}>
+        keyboardVerticalOffset={0}
+        enabled={Platform.OS === 'ios'}>
         <View style={styles.flex}>
           <View style={styles.flex}>
             <Animated.View style={[styles.headerBar, actionRailEntryStyle]}>
               <SaveIndicator status={saveStatus} />
+              {keyboardVisible && wordCount > 0 ? (
+                <Text style={[styles.compactWordCount, {color: colors.textMuted}]}>
+                  {wordCount} words · {wordCount < 200 ? '< 1' : Math.round(wordCount / 200)} min
+                </Text>
+              ) : null}
               <View style={styles.flex} />
               {!isPublishedEditMode ? (
                 <Pressable
@@ -845,6 +859,16 @@ export function JournalEditorScreen({navigation, route}: Props) {
                     : <UnlockIcon size={18} color={colors.textMuted} />}
                 </Pressable>
               ) : null}
+              <Pressable
+                onPress={() => {
+                  Haptics.tap();
+                  toggleAtmosphere();
+                }}
+                style={styles.headerIconBtn}
+                accessibilityLabel={`Toggle writing atmosphere, currently ${atmosphereEnabled ? 'on' : 'off'}`}
+                accessibilityHint="When enabled, the editor background subtly changes as you write">
+                <FireIcon size={18} color={atmosphereEnabled ? colors.accentGold : colors.textMuted} />
+              </Pressable>
               {!isPublishedEditMode ? (
                 <Pressable
                   onPress={() => {
@@ -897,7 +921,7 @@ export function JournalEditorScreen({navigation, route}: Props) {
               </Animated.View>
             ) : null}
 
-            <View style={[styles.writingSurface, {backgroundColor: colors.bgElevated}]}>
+            <View style={[styles.writingSurface, {backgroundColor: atmosphereEnabled ? 'transparent' : colors.bgElevated}]}>
               <Animated.View style={[styles.titleArea, titleEntryStyle, titleFocusStyle]}>
                 <TextInput
                   placeholder="Untitled"
@@ -954,6 +978,9 @@ export function JournalEditorScreen({navigation, route}: Props) {
           />
 
           {!keyboardVisible ? <View style={{height: insets.bottom}} /> : null}
+          {Platform.OS === 'android' && keyboardVisible ? (
+            <View style={{height: keyboardHeight + insets.bottom}} />
+          ) : null}
         </View>
       </KeyboardAvoidingView>
 
@@ -1040,6 +1067,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui.medium,
     fontSize: 14,
     lineHeight: 20,
+  },
+  compactWordCount: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 11,
+    lineHeight: 16,
+    letterSpacing: 0.2,
   },
   publishBtnText: {
     fontFamily: fonts.ui.semiBold,

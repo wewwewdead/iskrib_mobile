@@ -32,6 +32,7 @@ export function PinnedPostsSection({userId, isOwnProfile}: PinnedPostsSectionPro
         : mobileApi.getVisitedPinnedJournals(userId, user?.id),
     enabled: !!userId,
     staleTime: 1000 * 60 * 5,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
   });
 
@@ -108,6 +109,7 @@ export function PinnedPostsSection({userId, isOwnProfile}: PinnedPostsSectionPro
                   style={styles.thumb}
                   resizeMode="cover"
                   accessibilityLabel={journal.title || 'Pinned post thumbnail'}
+                  disableFadeIn
                 />
               </View>
             ) : (

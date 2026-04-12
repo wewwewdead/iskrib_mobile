@@ -26,7 +26,6 @@ export function PromptResponsesScreen({route, navigation}: Props) {
     queryFn: ({pageParam}) => mobileApi.getPromptResponses(promptId, pageParam ?? null),
     initialPageParam: null as string | null,
     getNextPageParam: lastPage => lastPage.before ?? undefined,
-    maxPages: 4,
   });
 
   const responses = useMemo(

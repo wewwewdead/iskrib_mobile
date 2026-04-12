@@ -64,7 +64,7 @@ interface PostCardProps {
   showEditAction?: boolean;
 }
 
-export function PostCard({
+function PostCardComponent({
   title,
   bodyPreview,
   authorName,
@@ -114,85 +114,46 @@ export function PostCard({
 
   const hasSource = !!(repostSourceTitle || repostSourcePreview || repostSourceAuthorName);
 
-  // Ref on the outer View — used by handlePressIn to measure the card's
-  // window-coordinate rectangle on first touch. The rect is cached in
-  // measuredRectRef and read later by handleLongPress.
+  // Ref on the outer View — measured only when the long-press threshold is
+  // actually reached so normal taps pay zero layout work.
   const outerViewRef = React.useRef<View>(null);
 
-  // Cached window-coordinate rect from the most recent onPressIn measure.
-  // Reset at the end of each touch (onPressOut) so a stale value doesn't
-  // leak into a later long-press on a different card.
-  const measuredRectRef = React.useRef<PeekSourceRect | null>(null);
-
-  // Fires on first touch. Kicks off measureInWindow and caches the
-  // rectangle in measuredRectRef. By the time the 400ms long-press
-  // threshold elapses, the async callback has resolved (measureInWindow
-  // typically completes within 1-2 frames) so handleLongPress can read
-  // the rect synchronously.
-  //
-  // Only built when onLongPress is wired — otherwise we don't want to
-  // pay the measurement cost on every regular card tap.
-  const handlePressIn = React.useMemo(() => {
+  const handleLongPress = React.useCallback(() => {
     if (!onLongPress) {
-      return undefined;
+      return;
     }
-    return () => {
-      const node = outerViewRef.current;
-      if (!node || typeof node.measureInWindow !== 'function') {
-        measuredRectRef.current = null;
+
+    const node = outerViewRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') {
+      onLongPress();
+      return;
+    }
+
+    node.measureInWindow((x, y, width, height) => {
+      if (
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        Number.isFinite(width) &&
+        Number.isFinite(height)
+      ) {
+        onLongPress({x, y, width, height});
         return;
       }
-      node.measureInWindow((x, y, width, height) => {
-        // measureInWindow returns NaN on some Android edge cases when
-        // the view isn't laid out yet. Guard against it and leave the
-        // ref null so handleLongPress falls through to the no-rect path.
-        if (
-          Number.isFinite(x) &&
-          Number.isFinite(y) &&
-          Number.isFinite(width) &&
-          Number.isFinite(height)
-        ) {
-          measuredRectRef.current = {x, y, width, height};
-        } else {
-          measuredRectRef.current = null;
-        }
-      });
-    };
+
+      onLongPress();
+    });
   }, [onLongPress]);
 
-  // Clear the cached rect when the touch ends. Prevents a stale rect
-  // from a previous card bleeding into the next long-press if the user
-  // rapidly touches different cards. Undefined (not installed on the
-  // Pressable) when onLongPress isn't wired — same conditional pattern
-  // as handlePressIn and handleLongPress so cards that opt out of peek
-  // pay zero measurement cost.
-  const handlePressOut = React.useMemo(() => {
-    if (!onLongPress) {
-      return undefined;
-    }
-    return () => {
-      measuredRectRef.current = null;
-    };
-  }, [onLongPress]);
-
-  // Pure synchronous read of the cached rect. If the cache is empty
-  // (measurement didn't complete, ref wasn't attached, or the handler
-  // is invoked from the accessibility rotor path which never fires
-  // onPressIn), call onLongPress without a rect and let PeekModal use
-  // its default entry animation.
-  const handleLongPress = React.useMemo(() => {
-    if (!onLongPress) {
-      return undefined;
-    }
-    return () => {
-      const cached = measuredRectRef.current;
-      if (cached) {
-        onLongPress(cached);
-      } else {
-        onLongPress();
+  const handleAccessibilityAction = React.useCallback(
+    (event: {nativeEvent: {actionName: string}}) => {
+      if (event.nativeEvent.actionName === 'longpress') {
+        // Rotor users have no press location — call without a rect so
+        // PeekModal falls back to the default entry animation.
+        onLongPress?.();
       }
-    };
-  }, [onLongPress]);
+    },
+    [onLongPress],
+  );
 
   return (
     <View
@@ -208,9 +169,7 @@ export function PostCard({
       <Pressable
         testID="post-card"
         onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onLongPress={handleLongPress}
+        onLongPress={onLongPress ? handleLongPress : undefined}
         delayLongPress={400}
         accessibilityHint={
           onLongPress ? 'Hold to preview, tap to read with comments' : undefined
@@ -221,16 +180,7 @@ export function PostCard({
             : undefined
         }
         onAccessibilityAction={
-          onLongPress
-            ? event => {
-                if (event.nativeEvent.actionName === 'longpress') {
-                  // Rotor users have no press location — call without
-                  // a rect so PeekModal falls back to the default entry
-                  // animation.
-                  onLongPress();
-                }
-              }
-            : undefined
+          onLongPress ? handleAccessibilityAction : undefined
         }
         style={({pressed}) => [pressed && styles.pressed]}>
       {isRepost ? (
@@ -310,6 +260,7 @@ export function PostCard({
               accessibilityLabel={`${title} banner image`}
               style={styles.banner}
               resizeMode="cover"
+              disableFadeIn
             />
           ) : null)}
 
@@ -433,6 +384,8 @@ export function PostCard({
     </View>
   );
 }
+
+export const PostCard = React.memo(PostCardComponent);
 
 const styles = StyleSheet.create({
   card: {

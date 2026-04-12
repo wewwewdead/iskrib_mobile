@@ -24,7 +24,7 @@
  *               │
  *               ├─ isOtherModalOpen? ──▶ return (no-op)
  *               │
- *               ├─ tapHaptic()
+ *               ├─ Haptics.milestone()
  *               │
  *               ├─ setPeekPost(post)
  *               │
@@ -34,7 +34,7 @@
  */
 import {useCallback, useRef, useState} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {tapHaptic} from '../lib/haptics';
+import {Haptics} from '../lib/haptics';
 import {queryClient} from '../lib/queryClient';
 import type {JournalItem} from '../lib/api/mobileApi';
 
@@ -114,7 +114,7 @@ export function usePeekModal({
         return;
       }
 
-      tapHaptic();
+      Haptics.milestone();
       setPeekState({post, sourceRect: sourceRect ?? null});
 
       if (!firstOpenFiredRef.current) {
@@ -133,7 +133,7 @@ export function usePeekModal({
 
   const closePeek = useCallback(() => {
     setPeekState(EMPTY_STATE);
-    tapHaptic();
+    Haptics.tap();
   }, []);
 
   return {

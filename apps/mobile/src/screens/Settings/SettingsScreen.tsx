@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -20,14 +20,29 @@ import {useTheme, FONT_SIZE_PRESETS, type FontSizeKey} from '../../theme/ThemePr
 import {fonts, typeScale} from '../../theme/typography';
 import {spacing, radii} from '../../theme/spacing';
 import {ChevronRightIcon} from '../../components/icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '../../lib/supabase';
 import type {RootStackParamList} from '../../navigation/types';
+
+const ATMOSPHERE_KEY = '@iskrib:atmosphereEnabled';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 export function SettingsScreen({navigation}: Props) {
   const {user, signOut} = useAuth();
   const {colors, isDark, toggleTheme, fontSizeKey, setFontSize, scaledType} = useTheme();
+
+  // Atmosphere toggle
+  const [atmosphereEnabled, setAtmosphereEnabled] = useState(true);
+  useEffect(() => {
+    AsyncStorage.getItem(ATMOSPHERE_KEY).then(val => {
+      if (val === 'false') setAtmosphereEnabled(false);
+    });
+  }, []);
+  const handleAtmosphereToggle = useCallback(async (value: boolean) => {
+    setAtmosphereEnabled(value);
+    await AsyncStorage.setItem(ATMOSPHERE_KEY, String(value));
+  }, []);
 
   // Email change state
   const [newEmail, setNewEmail] = useState('');
@@ -466,6 +481,21 @@ export function SettingsScreen({navigation}: Props) {
                   onValueChange={toggleTheme}
                   trackColor={{false: colors.borderLight, true: colors.accentAmber}}
                   thumbColor="#FFFFFF"
+                />
+              </View>
+              <View style={[styles.row, {borderTopWidth: 1, borderTopColor: colors.borderCard}]}>
+                <View style={{flex: 1}}>
+                  <Text style={[styles.rowLabel, {color: colors.textPrimary}]}>Writing Atmosphere</Text>
+                  <Text style={[styles.rowHint, {color: colors.textMuted}]}>
+                    Editor background shifts as you write
+                  </Text>
+                </View>
+                <Switch
+                  value={atmosphereEnabled}
+                  onValueChange={handleAtmosphereToggle}
+                  trackColor={{false: colors.borderLight, true: colors.accentAmber}}
+                  thumbColor="#FFFFFF"
+                  accessibilityLabel="Toggle writing atmosphere. When enabled, the editor background subtly changes as you write."
                 />
               </View>
             </View>

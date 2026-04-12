@@ -1,6 +1,17 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {Image, StyleSheet, View, type ImageProps, type ImageStyle, type StyleProp} from 'react-native';
-import Animated, {useSharedValue, withTiming, useAnimatedStyle} from 'react-native-reanimated';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {
+  Image,
+  StyleSheet,
+  View,
+  type ImageProps,
+  type ImageStyle,
+  type StyleProp,
+} from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import {useTheme} from '../theme/ThemeProvider';
 import {SkeletonLoader} from './SkeletonLoader';
 import {ImageIcon} from './icons';
@@ -18,50 +29,38 @@ type Props = Omit<ImageProps, 'source'> & {
   disableFadeIn?: boolean;
 };
 
+type ImageStatus = 'loading' | 'success' | 'error';
+
+type SharedImageFrameProps = {
+  accessibilityLabel: string;
+  children: React.ReactNode;
+  showPlaceholder: boolean;
+  showSkeleton: boolean;
+  style?: StyleProp<ImageStyle>;
+  status: ImageStatus;
+};
+
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
-/**
- * Network image wrapper with:
- * - SkeletonLoader shimmer while loading
- * - Warm bgSecondary placeholder + faint icon on error
- * - 200ms fadeIn on success (prevents pop-in)
- * - Null URI → placeholder immediately
- */
-export function NetworkImage({
-  uri,
-  style,
-  accessibilityLabel,
-  disableFadeIn,
-  ...rest
-}: Props) {
-  const {colors} = useTheme();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
-    uri ? 'loading' : 'error',
-  );
-  const opacity = useSharedValue(disableFadeIn ? 1 : 0);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
-  const handleLoad = useCallback(() => {
-    setStatus('success');
-    if (!disableFadeIn) {
-      opacity.value = withTiming(1, {duration: 200});
-    }
-  }, [disableFadeIn, opacity]);
-
-  const handleError = useCallback(() => {
-    setStatus('error');
-  }, []);
+function useImageStatus(uri: string | null | undefined) {
+  const [status, setStatus] = useState<ImageStatus>(uri ? 'loading' : 'error');
 
   useEffect(() => {
     setStatus(uri ? 'loading' : 'error');
-    opacity.value = disableFadeIn ? 1 : 0;
-  }, [disableFadeIn, opacity, uri]);
+  }, [uri]);
 
-  const showPlaceholder = status === 'error' || !uri;
-  const showSkeleton = status === 'loading' && !!uri;
+  return {status, setStatus};
+}
+
+function SharedImageFrame({
+  accessibilityLabel,
+  children,
+  showPlaceholder,
+  showSkeleton,
+  style,
+  status,
+}: SharedImageFrameProps) {
+  const {colors} = useTheme();
 
   const a11yLabel =
     status === 'loading'
@@ -79,7 +78,7 @@ export function NetworkImage({
         <View style={StyleSheet.absoluteFill}>
           <SkeletonLoader
             width="100%"
-            style={{flex: 1}}
+            style={styles.skeletonFill}
           />
         </View>
       )}
@@ -95,7 +94,83 @@ export function NetworkImage({
         </View>
       )}
 
-      {uri && (
+      {children}
+    </View>
+  );
+}
+
+function StaticNetworkImage({
+  uri,
+  style,
+  accessibilityLabel,
+  ...rest
+}: Omit<Props, 'disableFadeIn'>) {
+  const {status, setStatus} = useImageStatus(uri);
+
+  const handleLoad = useCallback(() => {
+    setStatus('success');
+  }, [setStatus]);
+
+  const handleError = useCallback(() => {
+    setStatus('error');
+  }, [setStatus]);
+
+  const imageElement = useMemo(
+    () =>
+      uri ? (
+        <Image
+          {...rest}
+          source={{uri, cache: 'force-cache'}}
+          style={StyleSheet.absoluteFill}
+          onLoad={handleLoad}
+          onError={handleError}
+          accessibilityLabel={accessibilityLabel}
+        />
+      ) : null,
+    [accessibilityLabel, handleError, handleLoad, rest, uri],
+  );
+
+  return (
+    <SharedImageFrame
+      accessibilityLabel={accessibilityLabel}
+      showPlaceholder={status === 'error' || !uri}
+      showSkeleton={status === 'loading' && !!uri}
+      status={status}
+      style={style}>
+      {imageElement}
+    </SharedImageFrame>
+  );
+}
+
+function FadingNetworkImage({
+  uri,
+  style,
+  accessibilityLabel,
+  ...rest
+}: Omit<Props, 'disableFadeIn'>) {
+  const {status, setStatus} = useImageStatus(uri);
+  const opacity = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  const handleLoad = useCallback(() => {
+    setStatus('success');
+    opacity.value = withTiming(1, {duration: 200});
+  }, [opacity, setStatus]);
+
+  const handleError = useCallback(() => {
+    setStatus('error');
+  }, [setStatus]);
+
+  useEffect(() => {
+    opacity.value = 0;
+  }, [opacity, uri]);
+
+  const imageElement = useMemo(
+    () =>
+      uri ? (
         <AnimatedImage
           {...rest}
           source={{uri, cache: 'force-cache'}}
@@ -104,9 +179,38 @@ export function NetworkImage({
           onError={handleError}
           accessibilityLabel={accessibilityLabel}
         />
-      )}
-    </View>
+      ) : null,
+    [accessibilityLabel, animatedStyle, handleError, handleLoad, rest, uri],
   );
+
+  return (
+    <SharedImageFrame
+      accessibilityLabel={accessibilityLabel}
+      showPlaceholder={status === 'error' || !uri}
+      showSkeleton={status === 'loading' && !!uri}
+      status={status}
+      style={style}>
+      {imageElement}
+    </SharedImageFrame>
+  );
+}
+
+/**
+ * Network image wrapper with:
+ * - SkeletonLoader shimmer while loading
+ * - Warm bgSecondary placeholder + faint icon on error
+ * - 200ms fadeIn on success (prevents pop-in)
+ * - Null URI → placeholder immediately
+ */
+export function NetworkImage({
+  disableFadeIn,
+  ...props
+}: Props) {
+  if (disableFadeIn) {
+    return <StaticNetworkImage {...props} />;
+  }
+
+  return <FadingNetworkImage {...props} />;
 }
 
 const styles = StyleSheet.create({
@@ -116,5 +220,8 @@ const styles = StyleSheet.create({
   placeholder: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  skeletonFill: {
+    flex: 1,
   },
 });

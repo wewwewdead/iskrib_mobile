@@ -13,6 +13,7 @@ import {BottomTabScreenProps} from '@react-navigation/bottom-tabs';
 import {CompositeScreenProps, useFocusEffect} from '@react-navigation/native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {Screen} from '../../components/Screen';
+import {TabRootTransition} from '../../components/TabRootTransition';
 import {PrimaryButton} from '../../components/PrimaryButton';
 import {StoryCard} from '../../components/StoryCard';
 import {storyApi, type StoryItem, type StoryStatus} from '../../lib/api/storyApi';
@@ -148,50 +149,52 @@ export function StoryBrowserScreen({navigation}: Props) {
 
   return (
     <Screen scroll={false} padded={false}>
-      <FlatList
-        data={rows}
-        keyExtractor={item => item[0].id}
-        onEndReachedThreshold={0.3}
-        onEndReached={() => {
-          if (storiesQuery.hasNextPage && !storiesQuery.isFetchingNextPage) {
-            storiesQuery.fetchNextPage();
+      <TabRootTransition style={styles.content}>
+        <FlatList
+          data={rows}
+          keyExtractor={item => item[0].id}
+          onEndReachedThreshold={0.3}
+          onEndReached={() => {
+            if (storiesQuery.hasNextPage && !storiesQuery.isFetchingNextPage) {
+              storiesQuery.fetchNextPage();
+            }
+          }}
+          contentContainerStyle={styles.gridContent}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            storiesQuery.isLoading ? null : (
+              <Text style={[styles.hint, {color: colors.textMuted, paddingHorizontal: spacing.lg}]}>No stories found.</Text>
+            )
           }
-        }}
-        contentContainerStyle={styles.gridContent}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={
-          storiesQuery.isLoading ? null : (
-            <Text style={[styles.hint, {color: colors.textMuted, paddingHorizontal: spacing.lg}]}>No stories found.</Text>
-          )
-        }
-        renderItem={({item: [left, right]}) => (
-          <View style={styles.gridRow}>
-            <View style={styles.cardWrapper}>
-              <StoryCard
-                story={left}
-                onPress={() => navigation.navigate('StoryDetail', {storyId: left.id})}
-              />
-            </View>
-            {right ? (
+          renderItem={({item: [left, right]}) => (
+            <View style={styles.gridRow}>
               <View style={styles.cardWrapper}>
                 <StoryCard
-                  story={right}
-                  onPress={() => navigation.navigate('StoryDetail', {storyId: right.id})}
+                  story={left}
+                  onPress={() => navigation.navigate('StoryDetail', {storyId: left.id})}
                 />
               </View>
-            ) : (
-              <View style={styles.cardWrapper} />
-            )}
-          </View>
-        )}
-        ListFooterComponent={
-          storiesQuery.isFetchingNextPage ? (
-            <View style={styles.loadingMore}>
-              <ActivityIndicator color={colors.accentAmber} />
+              {right ? (
+                <View style={styles.cardWrapper}>
+                  <StoryCard
+                    story={right}
+                    onPress={() => navigation.navigate('StoryDetail', {storyId: right.id})}
+                  />
+                </View>
+              ) : (
+                <View style={styles.cardWrapper} />
+              )}
             </View>
-          ) : null
-        }
-      />
+          )}
+          ListFooterComponent={
+            storiesQuery.isFetchingNextPage ? (
+              <View style={styles.loadingMore}>
+                <ActivityIndicator color={colors.accentAmber} />
+              </View>
+            ) : null
+          }
+        />
+      </TabRootTransition>
     </Screen>
   );
 }
@@ -231,6 +234,9 @@ const styles = StyleSheet.create({
   },
   filterText: {
     fontSize: 13,
+  },
+  content: {
+    flex: 1,
   },
   gridContent: {
     paddingHorizontal: spacing.lg,

@@ -225,7 +225,7 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
 
   const activateLift = useCallback(() => {
     setIsLifted(true);
-    Haptics.tap();
+    Haptics.milestone();
   }, []);
 
   const handleSwipeEnd = useCallback(
