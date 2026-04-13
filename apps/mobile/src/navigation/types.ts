@@ -17,7 +17,8 @@ export type RootStackParamList = {
   Main: undefined;
   Onboarding: {userExists: boolean};
   PostDetail: {journalId: string; slug?: string};
-  JournalEditor: {mode: 'create' | 'draft' | 'edit'; journalId?: string; promptId?: string; promptText?: string};
+  JournalEditor: {mode: 'create' | 'draft' | 'edit'; journalId?: string; promptId?: string; promptText?: string; parentJournalId?: string};
+  EchoBloom: {journalId: string};
   StoryDetail: {storyId: string};
   StoryEditor: {storyId?: string};
   StoryDashboard: undefined;

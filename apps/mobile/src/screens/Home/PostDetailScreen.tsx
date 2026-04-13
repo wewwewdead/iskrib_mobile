@@ -22,7 +22,8 @@ import {SkeletonLoader} from '../../components/SkeletonLoader';
 import {NetworkImage} from '../../components/NetworkImage';
 import {LexicalRenderer} from '../../lib/content/LexicalRenderer';
 import {ImageViewerModal} from '../../components/ImageViewerModal';
-import {RelatedPosts} from '../../components/Discovery/RelatedPosts';
+import {EchoesSection} from '../../components/EchoBloom/EchoesSection';
+import {ThreadPanel} from '../../components/EchoBloom/ThreadPanel';
 import {ScreenEntrance} from '../../components/ScreenEntrance';
 import {useAuth} from '../../features/auth/AuthProvider';
 import {useTheme} from '../../theme/ThemeProvider';
@@ -532,7 +533,8 @@ const JournalBody = React.memo(function JournalBody({
   return (
     <>
       <LexicalRenderer content={content} onImagePress={onImagePress} />
-      <RelatedPosts journalId={journalId} />
+      <ThreadPanel journalId={journalId} />
+      <EchoesSection journalId={journalId} />
     </>
   );
 });

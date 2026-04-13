@@ -37,6 +37,7 @@ export type JournalItem = {
   hot_score?: number;
   prompt_id?: string | null;
   writing_prompts?: {prompt_text?: string} | null;
+  parent_journal_id?: string | null;
   status?: 'draft' | 'published' | string | null;
 };
 
@@ -45,6 +46,116 @@ export type CursorPage<T> = {
   nextCursor?: string | null;
   hasMore?: boolean;
 };
+
+// ── Echo Bloom / Discovery responses ──
+//
+// The /journal/:id/related and /journal/:id/user-echoes endpoints both
+// return this shape. `confidence` is the server-computed tier:
+//   - 'high'   → top similarity ≥ 0.60 (related) / ≥ 0.55 (user-echoes)
+//   - 'medium' → top similarity ≥ 0.48 (related) / ≥ 0.42 (user-echoes)
+//   - 'low'    → top similarity ≥ 0.38 (related) / ≥ 0.32 (user-echoes)
+//   - 'none'   → no posts cleared the floor; `posts` is []
+// `topSimilarity` is pure cosine similarity (0..1).
+export type RelatedConfidence = 'high' | 'medium' | 'low' | 'none';
+
+export type RelatedPostEntry = JournalItem & {
+  user_name?: string | null;
+  user_image_url?: string | null;
+  user_badge?: string | null;
+  username?: string | null;
+  semantic_similarity?: number;
+  composite_score?: number;
+};
+
+export type RelatedPostsResponse = {
+  posts: RelatedPostEntry[];
+  confidence: RelatedConfidence;
+  topSimilarity: number;
+};
+
+// The /prompt/:id/responses endpoint actually returns only
+// `{id, title, created_at, user_id, users(id,name,image_url,badge)}`
+// per promptService.js:51-57 — much lighter than JournalItem. We type
+// the entry as JournalItem (all fields optional in practice) so existing
+// consumers that read extra fields still compile; those reads already
+// resolve to undefined at runtime. The accurate minimal shape is the
+// 5 fields named above; anything else is a historical type-lie that
+// Echo Bloom V2 deliberately does not touch to stay scoped.
+export type PromptResponseEntry = JournalItem;
+
+export type PromptResponsesResponse = {
+  responses: PromptResponseEntry[];
+  hasMore?: boolean;
+  count?: number;
+  uniqueCount?: number;
+  // `before` is NOT returned by the server — pagination on this endpoint
+  // is not actually wired (see PromptResponsesScreen.tsx:28). Kept
+  // optional so the existing consumer still typechecks.
+  before?: string | null;
+};
+
+// V3 — Thread chain. Returned by /journal/:id/thread (find_journal_thread
+// recursive CTE). Rows are ordered root → leaf by depth.
+//
+// Like the other discovery RPCs the server returns FLAT author columns
+// (user_name, user_image_url, user_badge, username). We normalize them
+// into a nested `users` object at the API boundary, same pattern as
+// normalizeRelatedPostEntry.
+export type ThreadJournalEntry = JournalItem & {
+  user_name?: string | null;
+  user_image_url?: string | null;
+  user_badge?: string | null;
+  username?: string | null;
+  depth?: number;
+};
+
+export type JournalThreadResponse = {
+  posts: ThreadJournalEntry[];
+};
+
+// The `find_related_posts` and `find_user_echoes` SQL RPCs return author
+// fields as FLAT columns (`user_name`, `user_image_url`, `user_badge`,
+// `username`) — not nested under a `users` object like every other journal
+// endpoint. Consumers (RelatedPosts.tsx, EchoCard.tsx, etc.) all read
+// `item.users?.name`, so we synthesize a nested `users` object at the API
+// boundary to paper over the shape difference. Keeps the flat fields too,
+// in case something wants the raw scoring/similarity signals.
+function normalizeRelatedPostEntry(entry: RelatedPostEntry): RelatedPostEntry {
+  if (entry.users?.id || !entry.user_id) return entry;
+  return {
+    ...entry,
+    users: {
+      id: entry.user_id,
+      name: entry.user_name ?? null,
+      username: entry.username ?? null,
+      image_url: entry.user_image_url ?? null,
+      badge: entry.user_badge ?? null,
+    },
+  };
+}
+
+function normalizeRelatedPostsResponse(
+  raw: RelatedPostsResponse,
+): RelatedPostsResponse {
+  return {
+    ...raw,
+    posts: (raw?.posts ?? []).map(normalizeRelatedPostEntry),
+  };
+}
+
+function normalizeThreadEntry(entry: ThreadJournalEntry): ThreadJournalEntry {
+  if (entry.users?.id || !entry.user_id) return entry;
+  return {
+    ...entry,
+    users: {
+      id: entry.user_id,
+      name: entry.user_name ?? null,
+      username: entry.username ?? null,
+      image_url: entry.user_image_url ?? null,
+      badge: entry.user_badge ?? null,
+    },
+  };
+}
 
 export type NotificationItem = {
   id: string;
@@ -227,11 +338,31 @@ export const mobileApi = {
     });
   },
 
-  async getRelatedPosts(journalId: string): Promise<{data: JournalItem[]}> {
-    return apiRequest<{data: JournalItem[]}>(
+  async getRelatedPosts(journalId: string): Promise<RelatedPostsResponse> {
+    const raw = await apiRequest<RelatedPostsResponse>(
       `/journal/${encodeURIComponent(journalId)}/related`,
       {method: 'GET'},
     );
+    return normalizeRelatedPostsResponse(raw);
+  },
+
+  async getUserEchoes(journalId: string): Promise<RelatedPostsResponse> {
+    const raw = await apiRequest<RelatedPostsResponse>(
+      `/journal/${encodeURIComponent(journalId)}/user-echoes`,
+      {method: 'GET'},
+    );
+    return normalizeRelatedPostsResponse(raw);
+  },
+
+  async getJournalThread(journalId: string): Promise<JournalThreadResponse> {
+    const raw = await apiRequest<JournalThreadResponse>(
+      `/journal/${encodeURIComponent(journalId)}/thread`,
+      {method: 'GET'},
+    );
+    return {
+      ...raw,
+      posts: (raw?.posts ?? []).map(normalizeThreadEntry),
+    };
   },
 
   async getUserJournals(userId: string, cursor: string | null, limit = 10): Promise<CursorPage<JournalItem>> {
@@ -313,19 +444,25 @@ export const mobileApi = {
     );
   },
 
-  async saveDraft(payload: {title: string; content: string; draftId?: string}): Promise<{id?: string; message?: string}> {
+  async saveDraft(payload: {title: string; content: string; draftId?: string; parentJournalId?: string}): Promise<{id?: string; message?: string}> {
+    const body: Record<string, unknown> = {
+      title: payload.title,
+      content: payload.content,
+    };
+    if (payload.draftId) body.draftId = payload.draftId;
+    if (payload.parentJournalId) body.parent_journal_id = payload.parentJournalId;
     return apiRequest<{id?: string; message?: string}>('/journal/draft', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
       retries: 0,
     });
   },
 
-  async publishDraft(journalId: string): Promise<{message?: string}> {
-    return apiRequest<{message?: string}>('/journal/publish', {
+  async publishDraft(journalId: string): Promise<{message?: string; id?: string; streak?: {current_streak?: number}}> {
+    return apiRequest<{message?: string; id?: string; streak?: {current_streak?: number}}>('/journal/publish', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -347,11 +484,11 @@ export const mobileApi = {
     });
   },
 
-  async getPromptResponses(promptId: string, cursor: string | null, limit = 10): Promise<{responses: JournalItem[]; before?: string}> {
+  async getPromptResponses(promptId: string | number, cursor: string | null = null, limit = 10): Promise<PromptResponsesResponse> {
     const params = new URLSearchParams();
     params.set('limit', String(limit));
     if (cursor) params.set('before', cursor);
-    return apiRequest<{responses: JournalItem[]; before?: string}>(`/prompt/${encodeURIComponent(promptId)}/responses?${params.toString()}`, {
+    return apiRequest<PromptResponsesResponse>(`/prompt/${encodeURIComponent(String(promptId))}/responses?${params.toString()}`, {
       method: 'GET',
     });
   },
@@ -460,7 +597,7 @@ export const mobileApi = {
     });
   },
 
-  async saveJournal(payload: { title: string; lexicalContent: string; privacy?: string; promptId?: string }): Promise<{ message?: string }> {
+  async saveJournal(payload: { title: string; lexicalContent: string; privacy?: string; promptId?: string; parentJournalId?: string }): Promise<{ message?: string; id?: string; streak?: { current_streak?: number } }> {
     const formData = new FormData();
     formData.append('title', payload.title);
     formData.append('content', payload.lexicalContent);
@@ -471,8 +608,11 @@ export const mobileApi = {
     if (payload.promptId) {
       formData.append('prompt_id', payload.promptId);
     }
+    if (payload.parentJournalId) {
+      formData.append('parent_journal_id', payload.parentJournalId);
+    }
 
-    return apiRequest<{ message?: string }>('/save-journal', {
+    return apiRequest<{ message?: string; id?: string; streak?: { current_streak?: number } }>('/save-journal', {
       method: 'POST',
       body: formData,
       timeoutMs: 30000,

@@ -7,6 +7,7 @@ import {Avatar} from '../Avatar';
 import {NetworkImage} from '../NetworkImage';
 import {BadgeCheckIcon, LightbulbIcon, PenIcon, RepostIcon} from '../icons';
 import {ActionBar} from './ActionBar';
+import {EchoesChip} from '../EchoBloom/EchoesChip';
 import type {PeekSourceRect} from '../../hooks/usePeekModal';
 
 interface PostCardProps {
@@ -353,6 +354,15 @@ function PostCardComponent({
                 {bodyPreview}
               </Text>
             ) : null}
+
+            {/* Echoes chip — renders only when the server has actually
+                returned at least one semantically-similar post for this
+                journal (see EchoesChip + useEchoesSummary). */}
+            {shareId ? (
+              <View style={styles.echoesChipRow}>
+                <EchoesChip journalId={shareId} />
+              </View>
+            ) : null}
           </View>
         </>
       )}
@@ -495,6 +505,10 @@ const styles = StyleSheet.create({
   body: {
     ...typeScale.bodySmall,
     lineHeight: 20,
+  },
+  echoesChipRow: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
   },
   repostBadge: {
     flexDirection: 'row',

@@ -44,6 +44,7 @@ import {ProfileCustomizeScreen} from '../screens/Profile/ProfileCustomizeScreen'
 import {WritingPreferencesScreen} from '../screens/Settings/WritingPreferencesScreen';
 import {PostDetailScreen} from '../screens/Home/PostDetailScreen';
 import {JournalEditorScreen} from '../screens/Editor/JournalEditorScreen';
+import {EchoBloomScreen} from '../screens/EchoBloom/EchoBloomScreen';
 import {DraftsScreen} from '../screens/Editor/DraftsScreen';
 import {BookmarksScreen} from '../screens/Profile/BookmarksScreen';
 import {StoryBrowserScreen} from '../screens/Stories/StoryBrowserScreen';
@@ -536,6 +537,16 @@ export function RootNavigator() {
               name="JournalEditor"
               component={JournalEditorScreen}
               options={{title: 'Journal Editor'}}
+            />
+            <RootStack.Screen
+              name="EchoBloom"
+              component={EchoBloomScreen}
+              options={{
+                title: 'Echo Bloom',
+                headerShown: false,
+                presentation: 'fullScreenModal',
+                animation: 'fade',
+              }}
             />
             <RootStack.Screen
               name="StoryDetail"

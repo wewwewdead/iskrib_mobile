@@ -33,6 +33,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import {AtmosphereLayer} from '../../components/AtmosphereLayer';
+import {BloomOverlay} from '../../components/EchoBloom/BloomOverlay';
 import {EditorToolbar} from '../../components/EditorToolbar';
 import {LinkInsertModal} from '../../components/LinkInsertModal';
 import {ReadingTimeBar} from '../../components/ReadingTimeBar';
@@ -237,7 +238,7 @@ function SpringChip({
 }
 
 export function JournalEditorScreen({navigation, route}: Props) {
-  const {promptId, promptText, mode, journalId} = route.params ?? {};
+  const {promptId, promptText, mode, journalId, parentJournalId} = route.params ?? {};
   const isDraftMode = mode === 'draft' && !!journalId;
   const isPublishedEditMode = mode === 'edit' && !!journalId;
   const isExistingJournalMode = (isDraftMode || isPublishedEditMode) && !!journalId;
@@ -257,6 +258,7 @@ export function JournalEditorScreen({navigation, route}: Props) {
   const saveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wordCountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   const [title, setTitle] = useState('');
   const [_html, setHtml] = useState('');
@@ -274,6 +276,19 @@ export function JournalEditorScreen({navigation, route}: Props) {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const isPublishingRef = useRef(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [showBloomOverlay, setShowBloomOverlay] = useState(false);
+
+  // V3 — when this editor was opened from "Continue this thought" the
+  // parentJournalId nav param will be set. We fetch the parent's title
+  // just to render a small "Continuing from: …" strip so the writer sees
+  // what they're threading from. The fetch reuses the same query key as
+  // PostDetail / Echo Bloom, so it's usually a cache hit.
+  const parentThreadQuery = useQuery({
+    queryKey: ['journal', parentJournalId, undefined],
+    queryFn: () => mobileApi.getJournalById(parentJournalId as string),
+    enabled: Boolean(parentJournalId),
+  });
+  const parentThreadTitle = parentThreadQuery.data?.journal?.title ?? null;
 
   const keyboardVisible = keyboardHeight > 0;
   const actionRailEntryStyle = useSpringEntrance(0, 16, 0.98);
@@ -507,6 +522,7 @@ export function JournalEditorScreen({navigation, route}: Props) {
         title: currentTitle || 'Untitled Draft',
         content: lexicalContent,
         draftId: isDraftMode ? journalId : undefined,
+        parentJournalId: isDraftMode ? undefined : parentJournalId,
       }).then(() => {
         queryClient.invalidateQueries({queryKey: ['drafts']});
       }).catch(() => {
@@ -694,6 +710,13 @@ export function JournalEditorScreen({navigation, route}: Props) {
     );
   }, []);
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const publishJournal = useCallback(() => {
     if (isPublishingRef.current) return;
     isPublishingRef.current = true;
@@ -703,6 +726,7 @@ export function JournalEditorScreen({navigation, route}: Props) {
     const capturedTitle = titleRef.current.trim();
     const capturedPrivacy = privacy;
     const capturedPromptId = promptId;
+    const capturedParentJournalId = parentJournalId;
 
     const runPublish = async () => {
       try {
@@ -713,7 +737,9 @@ export function JournalEditorScreen({navigation, route}: Props) {
             lexicalContent,
           });
           didSaveRef.current = true;
-          setSaveStatus('saved');
+          if (isMountedRef.current) {
+            setSaveStatus('saved');
+          }
           initialTitleRef.current = capturedTitle;
           initialHtmlRef.current = htmlRef.current;
           await invalidateEditedJournalQueries();
@@ -722,8 +748,9 @@ export function JournalEditorScreen({navigation, route}: Props) {
           return;
         }
 
-        didSaveRef.current = true;
-        navigation.goBack();
+        setShowBloomOverlay(true);
+
+        let resolvedJournalId: string | null = null;
 
         if (isDraftMode && journalId) {
           await mobileApi.saveDraft({
@@ -731,30 +758,53 @@ export function JournalEditorScreen({navigation, route}: Props) {
             content: lexicalContent,
             draftId: journalId,
           });
-          await mobileApi.publishDraft(journalId);
+          const publishResult = await mobileApi.publishDraft(journalId);
+          resolvedJournalId = publishResult?.id ?? journalId;
 
           queryClient.setQueryData<{data: any[]}>(['drafts'], old => {
             if (!old?.data) return old;
-            return {...old, data: old.data.filter((draft: any) => draft.id !== journalId)};
+            return {
+              ...old,
+              data: old.data.filter((draft: any) => draft.id !== journalId),
+            };
           });
         } else {
-          await mobileApi.saveJournal({
+          const saveResult = await mobileApi.saveJournal({
             title: capturedTitle,
             lexicalContent,
             privacy: capturedPrivacy,
             promptId: capturedPromptId,
+            parentJournalId: capturedParentJournalId,
           });
+          resolvedJournalId = saveResult?.id ?? null;
         }
 
         queryClient.invalidateQueries({queryKey: ['feed']});
         queryClient.invalidateQueries({queryKey: ['drafts']});
         Haptics.success();
+
+        if (resolvedJournalId) {
+          didSaveRef.current = true;
+          allowExitRef.current = true;
+          navigation.replace('EchoBloom', {journalId: resolvedJournalId});
+          return;
+        }
+
+        // Fallback: journalId couldn't be resolved — legacy goBack + toast path.
+        didSaveRef.current = true;
+        if (isMountedRef.current) {
+          setShowBloomOverlay(false);
+        }
         emitGlobalToast(
           isDraftMode ? 'Draft published.' : 'Journal published.',
           'success',
         );
+        navigation.goBack();
       } catch (error) {
-        setSaveStatus('error');
+        if (isMountedRef.current) {
+          setShowBloomOverlay(false);
+          setSaveStatus('error');
+        }
         Haptics.error();
         emitGlobalToast(
           error instanceof Error
@@ -766,12 +816,14 @@ export function JournalEditorScreen({navigation, route}: Props) {
         );
       } finally {
         isPublishingRef.current = false;
-        setIsPublishing(false);
+        if (isMountedRef.current) {
+          setIsPublishing(false);
+        }
       }
     };
 
     runPublish();
-  }, [invalidateEditedJournalQueries, isDraftMode, isPublishedEditMode, journalId, navigation, privacy, promptId, scheduleExit]);
+  }, [invalidateEditedJournalQueries, isDraftMode, isPublishedEditMode, journalId, navigation, privacy, promptId, parentJournalId, scheduleExit]);
 
   const handleSaveDraft = useCallback(() => {
     if (isSavingDraft || isPublishedEditMode) return;
@@ -784,6 +836,7 @@ export function JournalEditorScreen({navigation, route}: Props) {
       title: titleRef.current.trim() || 'Untitled Draft',
       content: lexicalContent,
       draftId: isDraftMode ? journalId : undefined,
+      parentJournalId: isDraftMode ? undefined : parentJournalId,
     }).then(() => {
       didSaveRef.current = true;
       setSaveStatus('saved');
@@ -921,6 +974,28 @@ export function JournalEditorScreen({navigation, route}: Props) {
               </Animated.View>
             ) : null}
 
+            {!keyboardVisible && parentJournalId && parentThreadTitle ? (
+              <Animated.View
+                style={[
+                  styles.promptStrip,
+                  {
+                    backgroundColor: `${colors.accentGold}12`,
+                    borderColor: `${colors.accentGold}33`,
+                    borderWidth: 1,
+                  },
+                  promptEntryStyle,
+                ]}>
+                <Text style={[styles.promptText, {color: colors.accentGold, fontFamily: fonts.ui.semiBold, fontSize: 11}]}>
+                  CONTINUING FROM
+                </Text>
+                <Text
+                  style={[styles.promptText, {color: colors.textSecondary, flex: 1}]}
+                  numberOfLines={1}>
+                  {parentThreadTitle}
+                </Text>
+              </Animated.View>
+            ) : null}
+
             <View style={[styles.writingSurface, {backgroundColor: atmosphereEnabled ? 'transparent' : colors.bgElevated}]}>
               <Animated.View style={[styles.titleArea, titleEntryStyle, titleFocusStyle]}>
                 <TextInput
@@ -1001,6 +1076,8 @@ export function JournalEditorScreen({navigation, route}: Props) {
           onDismiss={dismissToast}
         />
       ) : null}
+
+      {showBloomOverlay ? <BloomOverlay /> : null}
     </SafeAreaView>
   );
 }
