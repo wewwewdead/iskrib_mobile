@@ -4,6 +4,7 @@ import {
   Alert,
   Dimensions,
   FlatList,
+  Image,
   Modal,
   Platform,
   type NativeScrollEvent,
@@ -59,7 +60,7 @@ interface ProfileMediaTabProps {
   isOwnProfile?: boolean;
 }
 
-type MediaItem = {id: string; url: string; bucket?: string; path?: string};
+type MediaItem = {id: string; url: string; bucket?: string; path?: string; thumbnailUrl?: string; detailUrl?: string};
 
 type TileRect = {x: number; y: number; width: number; height: number};
 
@@ -109,11 +110,10 @@ const MediaGridTile = React.memo(function MediaGridTile({
   return (
     <View ref={tileRef}>
       <Pressable onPress={handlePress}>
-        <NetworkImage
-          uri={item.url}
+        <Image
+          source={{uri: item.thumbnailUrl || item.url, cache: 'force-cache'}}
           style={styles.tile}
           accessibilityLabel="Profile media image"
-          disableFadeIn
         />
       </Pressable>
       {isOwnProfile && (
@@ -142,7 +142,7 @@ const MediaViewerPage = React.memo(
       <Animated.View
         style={[styles.swiperPage, isActive && liftStyle]}>
         <NetworkImage
-          uri={item.url}
+          uri={item.detailUrl || item.url}
           style={styles.fullImage}
           resizeMode="contain"
           accessibilityLabel="Selected profile media image"
@@ -452,6 +452,7 @@ export function ProfileMediaTab({userId, headerComponent, isOwnProfile}: Profile
         : mobileApi.getVisitedProfileMedia(userId, pageParam ?? null),
     initialPageParam: null as string | null,
     getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
+    maxPages: 5,
   });
 
   useEffect(() => {
@@ -578,6 +579,7 @@ const styles = StyleSheet.create({
     width: TILE_SIZE,
     height: TILE_SIZE,
     borderRadius: 4,
+    backgroundColor: '#1a1a1a',
   },
   tileMenuBtn: {
     position: 'absolute',

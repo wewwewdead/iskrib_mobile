@@ -26,8 +26,8 @@ export const HORIZONTAL_CARD_LIST_PROPS = {
 
 export const IMAGE_GRID_LIST_PROPS = {
   initialNumToRender: 12,
-  maxToRenderPerBatch: 12,
-  windowSize: 4,
+  maxToRenderPerBatch: 6,
+  windowSize: 3,
   updateCellsBatchingPeriod: 50,
-  removeClippedSubviews: Platform.OS === 'android',
+  removeClippedSubviews: true,
 } as const;

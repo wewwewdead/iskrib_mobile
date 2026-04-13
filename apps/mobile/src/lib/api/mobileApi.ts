@@ -362,7 +362,7 @@ export const mobileApi = {
     });
   },
 
-  async getProfileMedia(cursor: string | null, limit = 20): Promise<{data: Array<{id: string; url: string; bucket?: string; path?: string}>; nextCursor?: string}> {
+  async getProfileMedia(cursor: string | null, limit = 20): Promise<{data: Array<{id: string; url: string; bucket?: string; path?: string; thumbnailUrl?: string; detailUrl?: string}>; nextCursor?: string}> {
     const params = new URLSearchParams();
     params.set('limit', String(limit));
     if (cursor) params.set('cursor', cursor);
@@ -371,7 +371,7 @@ export const mobileApi = {
     });
   },
 
-  async getVisitedProfileMedia(userId: string, cursor: string | null, limit = 20): Promise<{data: Array<{id: string; url: string}>; nextCursor?: string}> {
+  async getVisitedProfileMedia(userId: string, cursor: string | null, limit = 20): Promise<{data: Array<{id: string; url: string; thumbnailUrl?: string; detailUrl?: string}>; nextCursor?: string}> {
     const params = new URLSearchParams();
     params.set('userId', userId);
     params.set('limit', String(limit));
