@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -16,21 +16,102 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {PrimaryButton} from '../../components/PrimaryButton';
 import {ScreenEntrance} from '../../components/ScreenEntrance';
 import {useAuth} from '../../features/auth/AuthProvider';
-import {useTheme, FONT_SIZE_PRESETS, type FontSizeKey} from '../../theme/ThemeProvider';
+import {
+  useTheme,
+  FONT_SIZE_PRESETS,
+  type FontSizeKey,
+  type ThemeMode,
+} from '../../theme/ThemeProvider';
 import {fonts, typeScale} from '../../theme/typography';
 import {spacing, radii} from '../../theme/spacing';
 import {ChevronRightIcon} from '../../components/icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '../../lib/supabase';
 import type {RootStackParamList} from '../../navigation/types';
+import {
+  CUSTOM_THEME_SWATCHES,
+  darkPalette,
+  universePalette,
+  type CustomThemeField,
+  type Palette,
+  type ResolvedCustomThemeSelection,
+} from '../../theme/tokens';
 
 const ATMOSPHERE_KEY = '@iskrib:atmosphereEnabled';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
+type SettingsThemeOption = {
+  mode: Extract<ThemeMode, 'dark' | 'universe' | 'custom'>;
+  label: string;
+  description: string;
+  palette: Palette;
+};
+
+function ThemePreviewStrip({palette}: {palette: Palette}) {
+  const previewColors = [
+    palette.bgPrimary,
+    palette.bgCard,
+    palette.textPrimary,
+    palette.accentAmber,
+  ];
+
+  return (
+    <View style={[styles.themePreviewStrip, {backgroundColor: palette.bgSecondary, borderColor: palette.borderCard}]}>
+      {previewColors.map((color, index) => (
+        <View
+          key={`${color}-${index}`}
+          style={[
+            styles.themePreviewSwatch,
+            {
+              backgroundColor: color,
+              borderColor: index === 2 ? palette.borderLight : 'transparent',
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
 export function SettingsScreen({navigation}: Props) {
   const {user, signOut} = useAuth();
-  const {colors, isDark, toggleTheme, fontSizeKey, setFontSize, scaledType} = useTheme();
+  const {
+    colors,
+    isDark,
+    theme,
+    setTheme,
+    customTheme,
+    customThemeColors,
+    setCustomThemeField,
+    fontSizeKey,
+    setFontSize,
+    scaledType,
+  } = useTheme();
+
+  const themeOptions = useMemo<SettingsThemeOption[]>(
+    () => [
+      {
+        mode: 'dark',
+        label: 'Dark Mode',
+        description: 'Classic obsidian surfaces with warm gold accents.',
+        palette: darkPalette,
+      },
+      {
+        mode: 'universe',
+        label: 'Universe Mode',
+        description: 'Midnight indigo depth with a cosmic, premium glow.',
+        palette: universePalette,
+      },
+      {
+        mode: 'custom',
+        label: 'Custom Mode',
+        description: 'Curated dark swatches for a personalized atmosphere.',
+        palette: customThemeColors,
+      },
+    ],
+    [customThemeColors],
+  );
 
   // Atmosphere toggle
   const [atmosphereEnabled, setAtmosphereEnabled] = useState(true);
@@ -185,8 +266,68 @@ export function SettingsScreen({navigation}: Props) {
         focusedField === field ? colors.accentAmber : colors.borderCard,
       color: colors.textPrimary,
     },
-    focusedField === field && styles.inputFocused,
+    focusedField === field && [
+      styles.inputFocused,
+      {shadowColor: colors.accentAmber},
+    ],
   ];
+
+  function renderCustomThemeField<K extends CustomThemeField>(
+    field: K,
+    label: string,
+    options: readonly {
+      id: ResolvedCustomThemeSelection[K];
+      label: string;
+      swatch: string;
+    }[],
+  ) {
+    return (
+      <View key={field} style={styles.customThemeField}>
+        <Text style={[styles.customThemeFieldLabel, {color: colors.textMuted}]}>
+          {label}
+        </Text>
+        <View style={styles.customThemeSwatches}>
+          {options.map(option => {
+            const selected = customTheme[field] === option.id;
+
+            return (
+              <Pressable
+                key={option.id}
+                onPress={() => setCustomThemeField(field, option.id)}
+                accessibilityRole="button"
+                accessibilityState={{selected}}
+                style={[
+                  styles.customThemeChip,
+                  {
+                    borderColor: selected ? colors.accentAmber : colors.borderCard,
+                    backgroundColor: selected ? colors.bgElevated : colors.bgSecondary,
+                  },
+                ]}>
+                <View
+                  style={[
+                    styles.customThemeChipSwatch,
+                    {
+                      backgroundColor: option.swatch,
+                      borderColor: selected ? colors.accentAmber : colors.borderLight,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.customThemeChipLabel,
+                    {
+                      color: selected ? colors.textPrimary : colors.textSecondary,
+                    },
+                  ]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safe, {backgroundColor: colors.bgPrimary}]} edges={['top']}>
@@ -474,14 +615,132 @@ export function SettingsScreen({navigation}: Props) {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, {color: colors.textMuted}]}>Appearance</Text>
             <View style={[styles.card, {backgroundColor: colors.bgCard, borderColor: colors.borderCard}]}>
-              <View style={styles.row}>
-                <Text style={[styles.rowLabel, {color: colors.textPrimary}]}>Dark Mode</Text>
-                <Switch
-                  value={isDark}
-                  onValueChange={toggleTheme}
-                  trackColor={{false: colors.borderLight, true: colors.accentAmber}}
-                  thumbColor="#FFFFFF"
-                />
+              <View style={styles.appearanceInner}>
+                <View style={styles.appearanceIntro}>
+                  <Text style={[styles.appearanceTitle, {color: colors.textPrimary}]}>
+                    Theme
+                  </Text>
+                  <Text style={[styles.appearanceHint, {color: colors.textMuted}]}>
+                    Choose the overall atmosphere for the app.
+                  </Text>
+                  {theme === 'light' ? (
+                    <Text
+                      style={[
+                        styles.appearanceLegacyHint,
+                        {color: colors.textMuted},
+                      ]}>
+                      Legacy Light Mode is still active. Select a theme below to switch.
+                    </Text>
+                  ) : null}
+                </View>
+
+                <View style={styles.themeOptionList}>
+                  {themeOptions.map(option => {
+                    const active = theme === option.mode;
+
+                    return (
+                      <Pressable
+                        key={option.mode}
+                        onPress={() => setTheme(option.mode)}
+                        accessibilityRole="button"
+                        accessibilityState={{selected: active}}
+                        style={[
+                          styles.themeOptionCard,
+                          {
+                            borderColor: active ? colors.accentAmber : colors.borderCard,
+                            backgroundColor: active ? colors.bgElevated : colors.bgSecondary,
+                          },
+                        ]}>
+                        <View style={styles.themeOptionHeader}>
+                          <View style={styles.themeOptionText}>
+                            <Text
+                              style={[
+                                styles.themeOptionTitle,
+                                {color: colors.textPrimary},
+                              ]}>
+                              {option.label}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.themeOptionDescription,
+                                {color: colors.textMuted},
+                              ]}>
+                              {option.description}
+                            </Text>
+                          </View>
+                          {active ? (
+                            <View
+                              style={[
+                                styles.themeActiveBadge,
+                                {
+                                  borderColor: colors.accentAmber,
+                                  backgroundColor: colors.accentAmber + '18',
+                                },
+                              ]}>
+                              <Text
+                                style={[
+                                  styles.themeActiveBadgeText,
+                                  {color: colors.accentAmber},
+                                ]}>
+                                Active
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        <ThemePreviewStrip palette={option.palette} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {theme === 'custom' ? (
+                  <View
+                    style={[
+                      styles.customThemePanel,
+                      {
+                        backgroundColor: colors.bgSecondary,
+                        borderColor: colors.borderCard,
+                      },
+                    ]}>
+                    <View style={styles.customThemeIntro}>
+                      <Text
+                        style={[
+                          styles.customThemeTitle,
+                          {color: colors.textPrimary},
+                        ]}>
+                        Custom Palette
+                      </Text>
+                      <Text
+                        style={[
+                          styles.customThemeHint,
+                          {color: colors.textMuted},
+                        ]}>
+                        Swatches apply instantly and stay within a safe dark base.
+                      </Text>
+                    </View>
+
+                    {renderCustomThemeField(
+                      'primaryBackground',
+                      'Primary Background',
+                      CUSTOM_THEME_SWATCHES.primaryBackground,
+                    )}
+                    {renderCustomThemeField(
+                      'cardBackground',
+                      'Card Surface',
+                      CUSTOM_THEME_SWATCHES.cardBackground,
+                    )}
+                    {renderCustomThemeField(
+                      'primaryText',
+                      'Primary Text',
+                      CUSTOM_THEME_SWATCHES.primaryText,
+                    )}
+                    {renderCustomThemeField(
+                      'accentColor',
+                      'Accent Color',
+                      CUSTOM_THEME_SWATCHES.accentColor,
+                    )}
+                  </View>
+                ) : null}
               </View>
               <View style={[styles.row, {borderTopWidth: 1, borderTopColor: colors.borderCard}]}>
                 <View style={{flex: 1}}>
@@ -587,7 +846,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui.regular,
   },
   inputFocused: {
-    shadowColor: '#D4A853',
     shadowOffset: {width: 0, height: 0},
     shadowOpacity: 0.15,
     shadowRadius: 6,
@@ -634,6 +892,132 @@ const styles = StyleSheet.create({
   },
   fontSizeChipLabel: {
     fontFamily: fonts.ui.medium,
+  },
+  appearanceInner: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  appearanceIntro: {
+    gap: spacing.xs,
+  },
+  appearanceTitle: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 16,
+  },
+  appearanceHint: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  appearanceLegacyHint: {
+    fontFamily: fonts.ui.medium,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  themeOptionList: {
+    gap: spacing.sm,
+  },
+  themeOptionCard: {
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  themeOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  themeOptionText: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
+  themeOptionTitle: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 15,
+  },
+  themeOptionDescription: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  themeActiveBadge: {
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+  },
+  themeActiveBadgeText: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  themePreviewStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.sm,
+  },
+  themePreviewSwatch: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  customThemePanel: {
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  customThemeIntro: {
+    gap: spacing.xxs,
+  },
+  customThemeTitle: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 15,
+  },
+  customThemeHint: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  customThemeField: {
+    gap: spacing.sm,
+  },
+  customThemeFieldLabel: {
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  customThemeSwatches: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  customThemeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  customThemeChipSwatch: {
+    width: 16,
+    height: 16,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+  },
+  customThemeChipLabel: {
+    fontFamily: fonts.ui.medium,
+    fontSize: 12,
   },
   signOutBtn: {
     borderRadius: radii.md,

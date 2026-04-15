@@ -1,5 +1,7 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useTheme} from '../../theme/ThemeProvider';
 import {fonts, typeScale} from '../../theme/typography';
 import {spacing, radii, shadows} from '../../theme/spacing';
@@ -8,6 +10,11 @@ import {NetworkImage} from '../NetworkImage';
 import {BadgeCheckIcon, LightbulbIcon, PenIcon, RepostIcon} from '../icons';
 import {ActionBar} from './ActionBar';
 import {EchoesChip} from '../EchoBloom/EchoesChip';
+import {ContinueChip} from '../EchoBloom/ContinueChip';
+import {ThreadPreview} from './ThreadPreview';
+import {useThreadPreview} from '../../hooks/useThreadPreview';
+import {Haptics} from '../../lib/haptics';
+import type {RootStackParamList} from '../../navigation/types';
 import type {PeekSourceRect} from '../../hooks/usePeekModal';
 
 interface PostCardProps {
@@ -55,6 +62,27 @@ interface PostCardProps {
   onEmbeddedPress?: () => void;
   promptId?: string | null;
   promptText?: string | null;
+  parentJournalId?: string | null;
+  /**
+   * The id of this card's own journal — required when
+   * `showThreadPreview` is true so the preview hook can fetch the
+   * chain and so the spine logic can anchor to the current post.
+   */
+  journalId?: string;
+  /**
+   * The thread's root id if known — used to dedupe `useThreadPreview`
+   * queries so siblings in the same thread share one cache entry
+   * instead of firing per-post fetches. Optional: when omitted, the
+   * hook falls back to `journalId` as the key.
+   */
+  rootJournalId?: string | null;
+  /**
+   * Opt-in: fetch and render the inline thread preview strip below
+   * the body. Feed screens pass `true`; embedded / preview surfaces
+   * (e.g. the repost-source card on PostDetail) leave it off so they
+   * don't N+1 the thread endpoint.
+   */
+  showThreadPreview?: boolean;
   isPinned?: boolean;
   onPin?: () => void;
   showPinAction?: boolean;
@@ -63,6 +91,19 @@ interface PostCardProps {
   showPrivacyAction?: boolean;
   onEdit?: () => void;
   showEditAction?: boolean;
+  /**
+   * Opt-in: render a "Continue" chip next to Echoes that invokes
+   * onContinue(journalId). Valid on any published post — threading
+   * now works cross-user. Automatically suppressed on repost cards
+   * by the render gate.
+   *
+   * The callback takes the card's journalId so parents can pass a
+   * single stable callback via useCallback once at the top of the
+   * list screen and reuse it across every row — avoids the inline
+   * closure churn that would defeat React.memo on every card.
+   */
+  showContinueAction?: boolean;
+  onContinue?: (journalId: string) => void;
 }
 
 function PostCardComponent({
@@ -101,6 +142,10 @@ function PostCardComponent({
   onEmbeddedPress,
   promptId,
   promptText,
+  parentJournalId,
+  journalId,
+  rootJournalId,
+  showThreadPreview,
   isPinned,
   onPin,
   showPinAction,
@@ -109,6 +154,8 @@ function PostCardComponent({
   showPrivacyAction,
   onEdit,
   showEditAction,
+  showContinueAction,
+  onContinue,
 }: PostCardProps) {
   const {colors, scaledType} = useTheme();
   const s = shadows(colors);
@@ -355,13 +402,30 @@ function PostCardComponent({
               </Text>
             ) : null}
 
-            {/* Echoes chip — renders only when the server has actually
-                returned at least one semantically-similar post for this
-                journal (see EchoesChip + useEchoesSummary). */}
-            {shareId ? (
+            {/* Echoes chip + Continue chip row. Echoes gates internally
+                on /related confidence; Continue is opt-in per call site
+                and works on any published post (cross-user threading).
+                Render the row if either chip has something to contribute. */}
+            {shareId || (showContinueAction && onContinue && journalId) ? (
               <View style={styles.echoesChipRow}>
-                <EchoesChip journalId={shareId} />
+                {shareId ? <EchoesChip journalId={shareId} /> : null}
+                {showContinueAction && onContinue && journalId ? (
+                  <PostCardContinueSlot journalId={journalId} onContinue={onContinue} />
+                ) : null}
               </View>
+            ) : null}
+
+            {/* Inline thread preview — opt-in per call site. Hook is
+                isolated inside <PostCardThreadSlot> so cards that
+                opt out pay zero query cost. Fires on any card (parent
+                or child) so root posts that have been continued also
+                surface the "View full thread" affordance; the slot
+                renders null when the thread has no siblings. */}
+            {showThreadPreview && journalId ? (
+              <PostCardThreadSlot
+                journalId={journalId}
+                rootJournalId={rootJournalId}
+              />
             ) : null}
           </View>
         </>
@@ -396,6 +460,53 @@ function PostCardComponent({
 }
 
 export const PostCard = React.memo(PostCardComponent);
+
+// PostCardContinueSlot — bridges the `(journalId: string) => void`
+// parent callback down to ContinueChip's `() => void` onPress API via
+// a stable useCallback, so a parent list screen can hand one callback
+// to every card and preserve React.memo on the card.
+function PostCardContinueSlot({
+  journalId,
+  onContinue,
+}: {
+  journalId: string;
+  onContinue: (journalId: string) => void;
+}) {
+  const handlePress = React.useCallback(() => {
+    onContinue(journalId);
+  }, [journalId, onContinue]);
+  return <ContinueChip onPress={handlePress} />;
+}
+
+// PostCardThreadSlot — isolates the useQuery call so the hook only
+// fires on cards that opt into the thread preview. Kept in-file to
+// avoid a cross-file dance for one tiny presentational wrapper.
+function PostCardThreadSlot({
+  journalId,
+  rootJournalId,
+}: {
+  journalId: string;
+  rootJournalId?: string | null;
+}) {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const {data} = useThreadPreview(journalId, rootJournalId, true);
+
+  const handleViewFullThread = React.useCallback(() => {
+    Haptics.tap();
+    navigation.push('Thread', {journalId});
+  }, [journalId, navigation]);
+
+  if (!data || !data.posts || data.posts.length === 0) return null;
+
+  return (
+    <ThreadPreview
+      currentJournalId={journalId}
+      posts={data.posts}
+      onViewFullThread={handleViewFullThread}
+    />
+  );
+}
 
 const styles = StyleSheet.create({
   card: {
@@ -509,6 +620,8 @@ const styles = StyleSheet.create({
   echoesChipRow: {
     marginTop: spacing.md,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   },
   repostBadge: {
     flexDirection: 'row',

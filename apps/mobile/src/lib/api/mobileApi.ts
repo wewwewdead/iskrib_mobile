@@ -38,6 +38,7 @@ export type JournalItem = {
   prompt_id?: string | null;
   writing_prompts?: {prompt_text?: string} | null;
   parent_journal_id?: string | null;
+  root_journal_id?: string | null;
   status?: 'draft' | 'published' | string | null;
 };
 
@@ -107,20 +108,35 @@ export type ThreadJournalEntry = JournalItem & {
   user_badge?: string | null;
   username?: string | null;
   depth?: number;
+  // root_journal_id is already on JournalItem; listed here for clarity —
+  // the thread RPC returns it on every row so the client never has to
+  // infer it.
 };
 
 export type JournalThreadResponse = {
   posts: ThreadJournalEntry[];
+  totalCount: number;
+  hasMore: boolean;
 };
 
-// The `find_related_posts` and `find_user_echoes` SQL RPCs return author
-// fields as FLAT columns (`user_name`, `user_image_url`, `user_badge`,
-// `username`) — not nested under a `users` object like every other journal
-// endpoint. Consumers (RelatedPosts.tsx, EchoCard.tsx, etc.) all read
-// `item.users?.name`, so we synthesize a nested `users` object at the API
-// boundary to paper over the shape difference. Keeps the flat fields too,
-// in case something wants the raw scoring/similarity signals.
-function normalizeRelatedPostEntry(entry: RelatedPostEntry): RelatedPostEntry {
+// The `find_related_posts`, `find_user_echoes`, and `find_journal_thread`
+// SQL RPCs all return author fields as FLAT columns (`user_name`,
+// `user_image_url`, `user_badge`, `username`) — not nested under a `users`
+// object like every other journal endpoint. Consumers (RelatedPosts.tsx,
+// EchoCard.tsx, ThreadScreen.tsx, etc.) all read `item.users?.name`, so we
+// synthesize a nested `users` object at the API boundary to paper over the
+// shape difference. Keeps the flat fields too in case something wants the
+// raw scoring/similarity signals.
+type FlatAuthorEntry = {
+  user_id?: string | null;
+  user_name?: string | null;
+  user_image_url?: string | null;
+  user_badge?: string | null;
+  username?: string | null;
+  users?: UserPreview | null;
+};
+
+function normalizeFlatAuthorEntry<T extends FlatAuthorEntry>(entry: T): T {
   if (entry.users?.id || !entry.user_id) return entry;
   return {
     ...entry,
@@ -139,21 +155,7 @@ function normalizeRelatedPostsResponse(
 ): RelatedPostsResponse {
   return {
     ...raw,
-    posts: (raw?.posts ?? []).map(normalizeRelatedPostEntry),
-  };
-}
-
-function normalizeThreadEntry(entry: ThreadJournalEntry): ThreadJournalEntry {
-  if (entry.users?.id || !entry.user_id) return entry;
-  return {
-    ...entry,
-    users: {
-      id: entry.user_id,
-      name: entry.user_name ?? null,
-      username: entry.username ?? null,
-      image_url: entry.user_image_url ?? null,
-      badge: entry.user_badge ?? null,
-    },
+    posts: (raw?.posts ?? []).map(normalizeFlatAuthorEntry),
   };
 }
 
@@ -354,14 +356,23 @@ export const mobileApi = {
     return normalizeRelatedPostsResponse(raw);
   },
 
-  async getJournalThread(journalId: string): Promise<JournalThreadResponse> {
+  async getJournalThread(
+    journalId: string,
+    opts?: {limit?: number; offset?: number},
+  ): Promise<JournalThreadResponse> {
+    const query = new URLSearchParams();
+    if (typeof opts?.limit === 'number') query.set('limit', String(opts.limit));
+    if (typeof opts?.offset === 'number') query.set('offset', String(opts.offset));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
     const raw = await apiRequest<JournalThreadResponse>(
-      `/journal/${encodeURIComponent(journalId)}/thread`,
+      `/journal/${encodeURIComponent(journalId)}/thread${suffix}`,
       {method: 'GET'},
     );
+    const posts = (raw?.posts ?? []).map(normalizeFlatAuthorEntry);
     return {
-      ...raw,
-      posts: (raw?.posts ?? []).map(normalizeThreadEntry),
+      posts,
+      totalCount: Number(raw?.totalCount ?? posts.length) || 0,
+      hasMore: Boolean(raw?.hasMore),
     };
   },
 

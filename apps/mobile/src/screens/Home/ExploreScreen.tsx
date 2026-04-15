@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -80,6 +80,16 @@ export function ExploreScreen({navigation}: Props) {
   const {peekPost, peekSourceRect, openPeek, closePeek} = usePeekModal({
     isOtherModalOpen: !!commentModal || !!repostModal,
   });
+
+  const handleContinue = useCallback(
+    (journalId: string) => {
+      navigation.navigate('JournalEditor', {
+        mode: 'create',
+        parentJournalId: journalId,
+      });
+    },
+    [navigation],
+  );
 
   // --- Data fetching ---
 
@@ -190,6 +200,12 @@ export function ExploreScreen({navigation}: Props) {
         }
         onPress={() => navigation.navigate('PostDetail', {journalId: item.id})}
         shareId={item.id}
+        journalId={item.id}
+        rootJournalId={item.root_journal_id}
+        showThreadPreview
+        parentJournalId={item.parent_journal_id}
+        showContinueAction
+        onContinue={handleContinue}
         onAuthorPress={() => handleAuthorPress(item)}
         isRepost={isRepost}
         repostCaption={item.repost_caption}

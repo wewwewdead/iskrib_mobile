@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {ActivityIndicator, FlatList, StyleSheet, Text, View} from 'react-native';
 import {useInfiniteQuery} from '@tanstack/react-query';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
@@ -35,6 +35,16 @@ export function BookmarksScreen({navigation}: Props) {
   );
 
   const totalCount = bookmarksQuery.data?.pages[0]?.totalBookmarks;
+
+  const handleContinue = useCallback(
+    (journalId: string) => {
+      navigation.navigate('JournalEditor', {
+        mode: 'create',
+        parentJournalId: journalId,
+      });
+    },
+    [navigation],
+  );
 
   return (
     <Screen scroll={false}>
@@ -96,6 +106,12 @@ export function BookmarksScreen({navigation}: Props) {
                 bookmarkCount={bookmarkCount}
                 isBookmarked={item.has_bookmarked}
                 shareId={journal.id}
+                journalId={journal.id}
+                rootJournalId={journal.root_journal_id}
+                showThreadPreview
+                parentJournalId={journal.parent_journal_id}
+                showContinueAction
+                onContinue={handleContinue}
                 onPress={() =>
                   navigation.navigate('PostDetail', {journalId: journal.id})
                 }

@@ -8,13 +8,24 @@ import React, {
 } from 'react';
 import {Appearance} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {lightPalette, darkPalette, type Palette} from './tokens';
+import {
+  type CustomThemeField,
+  type Palette,
+  type ResolvedCustomThemeSelection,
+  type ThemeMode,
+  DEFAULT_CUSTOM_THEME_SELECTION,
+  getThemePalette,
+  isPaletteDark,
+  resolveCustomPalette,
+  resolveCustomThemeSelection,
+} from './tokens';
 import {typeScale as baseTypeScale, createScaledTypeScale} from './typography';
 
-const STORAGE_KEY = '@iskrib_theme';
-const FONT_SIZE_KEY = '@iskrib_font_size';
+export const THEME_STORAGE_KEY = '@iskrib_theme';
+export const CUSTOM_THEME_STORAGE_KEY = '@iskrib_theme_custom';
+export const FONT_SIZE_KEY = '@iskrib_font_size';
 
-type ThemeMode = 'light' | 'dark';
+export type {ThemeMode} from './tokens';
 export type FontSizeKey = 'small' | 'default' | 'large' | 'xlarge';
 
 export const FONT_SIZE_PRESETS: Record<FontSizeKey, {scale: number; label: string}> = {
@@ -30,6 +41,12 @@ interface ThemeContextValue {
   isDark: boolean;
   toggleTheme: () => void;
   setTheme: (mode: ThemeMode) => void;
+  customTheme: ResolvedCustomThemeSelection;
+  customThemeColors: Palette;
+  setCustomThemeField: <K extends CustomThemeField>(
+    field: K,
+    value: ResolvedCustomThemeSelection[K],
+  ) => void;
   fontSizeKey: FontSizeKey;
   fontScale: number;
   /** Pre-scaled typeScale — use this instead of the static `typeScale` for dynamic sizing. */
@@ -43,61 +60,169 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
+function persistValue(key: string, value: string) {
+  AsyncStorage.setItem(key, value).catch(() => {});
+}
+
+function getInitialThemeMode(): ThemeMode {
+  const appearance = Appearance.getColorScheme();
+  return appearance === 'light' || appearance === 'dark' ? appearance : 'dark';
+}
+
+function resolveStoredThemeMode(value: string | null): ThemeMode | null {
+  if (
+    value === 'light' ||
+    value === 'dark' ||
+    value === 'universe' ||
+    value === 'custom'
+  ) {
+    return value;
+  }
+  return null;
+}
+
 export function ThemeProvider({children}: {children: React.ReactNode}) {
-  const [theme, setThemeState] = useState<ThemeMode>(
-    () => (Appearance.getColorScheme() as ThemeMode) ?? 'dark',
+  const [theme, setThemeState] = useState<ThemeMode>(() => getInitialThemeMode());
+  const [customTheme, setCustomThemeState] = useState<ResolvedCustomThemeSelection>(
+    DEFAULT_CUSTOM_THEME_SELECTION,
   );
   const [fontSizeKey, setFontSizeKeyState] = useState<FontSizeKey>('default');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(STORAGE_KEY),
-      AsyncStorage.getItem(FONT_SIZE_KEY),
-    ]).then(([storedTheme, storedFont]) => {
-      if (storedTheme === 'light' || storedTheme === 'dark') {
-        setThemeState(storedTheme);
+    let active = true;
+
+    const hydrate = async () => {
+      try {
+        const [storedTheme, storedFont, storedCustomTheme] = await Promise.all([
+          AsyncStorage.getItem(THEME_STORAGE_KEY),
+          AsyncStorage.getItem(FONT_SIZE_KEY),
+          AsyncStorage.getItem(CUSTOM_THEME_STORAGE_KEY),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        const resolvedTheme = resolveStoredThemeMode(storedTheme);
+        if (resolvedTheme) {
+          setThemeState(resolvedTheme);
+        }
+
+        if (storedFont && storedFont in FONT_SIZE_PRESETS) {
+          setFontSizeKeyState(storedFont as FontSizeKey);
+        }
+
+        let parsedCustomTheme: unknown = null;
+        if (storedCustomTheme) {
+          try {
+            parsedCustomTheme = JSON.parse(storedCustomTheme);
+          } catch {
+            parsedCustomTheme = null;
+          }
+        }
+
+        setCustomThemeState(resolveCustomThemeSelection(parsedCustomTheme));
+      } finally {
+        if (active) {
+          setLoaded(true);
+        }
       }
-      if (storedFont && storedFont in FONT_SIZE_PRESETS) {
-        setFontSizeKeyState(storedFont as FontSizeKey);
-      }
-      setLoaded(true);
-    });
+    };
+
+    hydrate();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const setTheme = useCallback((mode: ThemeMode) => {
     setThemeState(mode);
-    AsyncStorage.setItem(STORAGE_KEY, mode);
+    persistValue(THEME_STORAGE_KEY, mode);
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  }, [theme, setTheme]);
+    setThemeState(currentTheme => {
+      const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      persistValue(THEME_STORAGE_KEY, nextTheme);
+      return nextTheme;
+    });
+  }, []);
+
+  const setCustomThemeField = useCallback(
+    function setCustomThemeField<K extends CustomThemeField>(
+      field: K,
+      value: ResolvedCustomThemeSelection[K],
+    ) {
+      setCustomThemeState(currentTheme => {
+        const nextTheme = {
+          ...currentTheme,
+          [field]: value,
+        };
+        persistValue(CUSTOM_THEME_STORAGE_KEY, JSON.stringify(nextTheme));
+        return nextTheme;
+      });
+    },
+    [],
+  );
 
   const setFontSize = useCallback((key: FontSizeKey) => {
     setFontSizeKeyState(key);
-    AsyncStorage.setItem(FONT_SIZE_KEY, key);
+    persistValue(FONT_SIZE_KEY, key);
   }, []);
 
   const fontScale = FONT_SIZE_PRESETS[fontSizeKey].scale;
 
+  const customThemeColors = useMemo(
+    () => resolveCustomPalette(customTheme),
+    [customTheme],
+  );
+
+  const colors = useMemo(() => {
+    return theme === 'custom'
+      ? customThemeColors
+      : getThemePalette(theme, customTheme);
+  }, [theme, customTheme, customThemeColors]);
+
+  const isDark = useMemo(() => isPaletteDark(colors), [colors]);
+
   const value = useMemo<ThemeContextValue>(() => {
     const scaledType = createScaledTypeScale(fontScale);
     const sf = (size: number) => Math.round(size * fontScale);
+
     return {
       theme,
-      colors: theme === 'dark' ? darkPalette : lightPalette,
-      isDark: theme === 'dark',
+      colors,
+      isDark,
       toggleTheme,
       setTheme,
+      customTheme,
+      customThemeColors,
+      setCustomThemeField,
       fontSizeKey,
       fontScale,
       scaledType,
       sf,
       setFontSize,
-      readingFont: {fontSize: scaledType.body.fontSize ?? 16, lineHeight: scaledType.body.lineHeight ?? 26},
+      readingFont: {
+        fontSize: scaledType.body.fontSize ?? 16,
+        lineHeight: scaledType.body.lineHeight ?? 26,
+      },
     };
-  }, [theme, toggleTheme, setTheme, fontSizeKey, fontScale, setFontSize]);
+  }, [
+    theme,
+    colors,
+    isDark,
+    toggleTheme,
+    setTheme,
+    customTheme,
+    customThemeColors,
+    setCustomThemeField,
+    fontSizeKey,
+    fontScale,
+    setFontSize,
+  ]);
 
   if (!loaded) {
     return null;

@@ -15,10 +15,15 @@ import {
   View,
 } from 'react-native';
 import Animated, {
+  Easing,
   runOnJS,
+  type SharedValue,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
+  withSequence,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import {
   Gesture,
@@ -53,6 +58,19 @@ const MEDIA_VIEWER_LIST_PROPS = {
 // Lift gesture tuning constants.
 const BACKDROP_OPACITY = 0.95;
 const LIFT_SCALE = 0.4;
+const LIFT_SCALE_MIN = 0.28;
+const DELETE_ZONE_SIZE = 88;
+const DELETE_ZONE_HIT_RADIUS = 92;
+const DELETE_ZONE_BOTTOM_OFFSET = 100;
+const DELETE_ZONE_CENTER_X = SCREEN_WIDTH / 2;
+const DELETE_ZONE_CENTER_Y =
+  SCREEN_HEIGHT - DELETE_ZONE_BOTTOM_OFFSET - DELETE_ZONE_SIZE / 2;
+const BURST_DOT_COUNT = 5;
+const BURST_DOT_DISTANCE = 72;
+const BURST_DOT_ANGLES = Array.from(
+  {length: BURST_DOT_COUNT},
+  (_, i) => (i * 2 * Math.PI) / BURST_DOT_COUNT - Math.PI / 2,
+);
 
 interface ProfileMediaTabProps {
   userId: string;
@@ -155,6 +173,28 @@ const MediaViewerPage = React.memo(
     prevProps.isActive === nextProps.isActive,
 );
 
+function BurstDot({
+  angle,
+  progress,
+}: {
+  angle: number;
+  progress: SharedValue<number>;
+}) {
+  const style = useAnimatedStyle(() => {
+    const p = progress.value;
+    const radius = BURST_DOT_DISTANCE * p;
+    return {
+      transform: [
+        {translateX: Math.cos(angle) * radius},
+        {translateY: Math.sin(angle) * radius},
+        {scale: 1 - p * 0.4},
+      ],
+      opacity: p === 0 ? 0 : Math.max(0, 1 - p),
+    };
+  });
+  return <Animated.View pointerEvents="none" style={[styles.burstDot, style]} />;
+}
+
 const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
   media,
   initialIndex,
@@ -162,6 +202,7 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
   isOwnProfile,
   deletePending,
   onDelete,
+  onDragDelete,
   onClose,
 }: {
   media: MediaItem[];
@@ -170,11 +211,14 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
   isOwnProfile?: boolean;
   deletePending: boolean;
   onDelete: (item: MediaItem) => void;
+  onDragDelete: (item: MediaItem) => void;
   onClose: () => void;
 }) {
   const {colors} = useTheme();
+  const reducedMotion = useReducedMotion();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isLifted, setIsLifted] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const swiperRef = useRef<FlatList<MediaItem>>(null);
   const anchorRef = useRef<{rect: TileRect; index: number}>({
     rect: initialRect,
@@ -187,10 +231,18 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
   const liftTx = useSharedValue(0);
   const liftTy = useSharedValue(0);
   const isLiftedShared = useSharedValue(false);
+  const isDeletingShared = useSharedValue(false);
   const backdropOpacity = useSharedValue(BACKDROP_OPACITY);
   const sourceRectX = useSharedValue(initialRect.x);
   const sourceRectY = useSharedValue(initialRect.y);
   const sourceRectW = useSharedValue(initialRect.width);
+  const dropZoneOpacity = useSharedValue(0);
+  const dropZoneScale = useSharedValue(1);
+  const dropZoneGlow = useSharedValue(0);
+  const isOverDeleteShared = useSharedValue(false);
+  const burstProgress = useSharedValue(0);
+  const canDeleteShared = useSharedValue(false);
+  const reducedMotionShared = useSharedValue(false);
 
   const selectedMedia =
     currentIndex >= 0 && currentIndex < media.length
@@ -208,6 +260,62 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: backdropOpacity.value,
   }));
+
+  const dropZoneStyle = useAnimatedStyle(() => ({
+    opacity: dropZoneOpacity.value,
+    transform: [{scale: dropZoneScale.value}],
+  }));
+
+  const dropZoneRingStyle = useAnimatedStyle(() => {
+    const g = dropZoneGlow.value;
+    return {
+      opacity: dropZoneOpacity.value * (0.45 * (1 - g) + 0.15),
+      transform: [{scale: 1 + g * 1.1}],
+    };
+  });
+
+  const canDelete =
+    !!isOwnProfile &&
+    currentIndex >= 0 &&
+    currentIndex < media.length &&
+    !!media[currentIndex]?.bucket &&
+    !!media[currentIndex]?.path;
+
+  useEffect(() => {
+    canDeleteShared.value = canDelete;
+  }, [canDelete, canDeleteShared]);
+
+  useEffect(() => {
+    reducedMotionShared.value = !!reducedMotion;
+  }, [reducedMotion, reducedMotionShared]);
+
+  useEffect(() => {
+    dropZoneOpacity.value = withSpring(
+      isLifted && canDelete ? 1 : 0,
+      SpringPresets.snappy,
+    );
+    if (!isLifted) {
+      dropZoneScale.value = withSpring(1, SpringPresets.snappy);
+      dropZoneGlow.value = withTiming(0, {duration: 160});
+      isOverDeleteShared.value = false;
+    }
+  }, [
+    canDelete,
+    dropZoneGlow,
+    dropZoneOpacity,
+    dropZoneScale,
+    isLifted,
+    isOverDeleteShared,
+  ]);
+
+  useEffect(() => {
+    // When user swipes to a different image in the viewer, reset burst/hover
+    // state so the next drag starts clean.
+    burstProgress.value = 0;
+    isOverDeleteShared.value = false;
+    dropZoneGlow.value = 0;
+    dropZoneScale.value = 1;
+  }, [burstProgress, currentIndex, dropZoneGlow, dropZoneScale, isOverDeleteShared]);
 
   const getSwiperItemLayout = useCallback(
     (_: ArrayLike<MediaItem> | null | undefined, index: number) => ({
@@ -227,6 +335,31 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
     setIsLifted(true);
     Haptics.milestone();
   }, []);
+
+  const selectedMediaRef = useRef<MediaItem | null>(null);
+  useEffect(() => {
+    selectedMediaRef.current = selectedMedia;
+  }, [selectedMedia]);
+
+  const handleAbsorbedDelete = useCallback(() => {
+    const item = selectedMediaRef.current;
+    if (!item) return;
+    backdropOpacity.value = withTiming(0, {duration: 220});
+    dropZoneOpacity.value = withTiming(0, {duration: 220});
+    onDragDelete(item);
+    // Small delay so the burst finishes on screen before the modal unmounts.
+    setTimeout(() => {
+      setIsDeleting(false);
+      isDeletingShared.value = false;
+      closeViewer();
+    }, 260);
+  }, [
+    backdropOpacity,
+    closeViewer,
+    dropZoneOpacity,
+    isDeletingShared,
+    onDragDelete,
+  ]);
 
   const handleSwipeEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -282,14 +415,28 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
     [currentIndex, liftStyle],
   );
 
+  const triggerHoverHaptic = useCallback(() => {
+    Haptics.selection();
+  }, []);
+
+  const triggerSuccessHaptic = useCallback(() => {
+    Haptics.success();
+  }, []);
+
+  const startDeleteFromWorklet = useCallback(() => {
+    setIsDeleting(true);
+  }, []);
+
   // Long-press to lift (image shrinks + backdrop fades). Pan to drag.
-  // Release: image flies back to its source tile in the grid, then closes.
+  // Release into the bottom drop zone → delete with celebratory animation.
+  // Release anywhere else → flies back to its source tile in the grid.
   const liftGesture = useMemo(() => {
     const longPress = Gesture.LongPress()
       .minDuration(280)
       .maxDistance(100000)
       .onStart(() => {
         'worklet';
+        if (isDeletingShared.value) return;
         isLiftedShared.value = true;
         liftScale.value = withSpring(LIFT_SCALE, SpringPresets.snappy);
         backdropOpacity.value = withSpring(0, SpringPresets.snappy);
@@ -300,22 +447,83 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
       .manualActivation(true)
       .onTouchesMove((_, manager) => {
         'worklet';
-        if (isLiftedShared.value) {
+        if (isLiftedShared.value && !isDeletingShared.value) {
           manager.activate();
         }
       })
       .onUpdate(e => {
         'worklet';
-        if (isLiftedShared.value) {
-          liftTx.value = e.translationX;
-          liftTy.value = e.translationY;
+        if (!isLiftedShared.value || isDeletingShared.value) return;
+        liftTx.value = e.translationX;
+        liftTy.value = e.translationY;
+
+        if (!canDeleteShared.value) return;
+
+        const imgCenterX = SCREEN_WIDTH / 2 + e.translationX;
+        const imgCenterY = SCREEN_HEIGHT / 2 + e.translationY;
+        const dx = imgCenterX - DELETE_ZONE_CENTER_X;
+        const dy = imgCenterY - DELETE_ZONE_CENTER_Y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Proximity-based image shrink: closer → smaller (but never below min).
+        const proximity = Math.min(1, Math.max(0, 1 - dist / 360));
+        liftScale.value =
+          LIFT_SCALE - (LIFT_SCALE - LIFT_SCALE_MIN) * proximity;
+
+        const nowOver = dist < DELETE_ZONE_HIT_RADIUS;
+        if (nowOver !== isOverDeleteShared.value) {
+          isOverDeleteShared.value = nowOver;
+          dropZoneScale.value = withSpring(
+            nowOver ? 1.18 : 1,
+            SpringPresets.bouncy,
+          );
+          dropZoneGlow.value = withTiming(nowOver ? 1 : 0, {duration: 220});
+          runOnJS(triggerHoverHaptic)();
         }
       })
       .onTouchesUp(() => {
         'worklet';
-        if (!isLiftedShared.value) return;
+        if (!isLiftedShared.value || isDeletingShared.value) return;
         isLiftedShared.value = false;
 
+        if (isOverDeleteShared.value && canDeleteShared.value) {
+          isDeletingShared.value = true;
+          isOverDeleteShared.value = false;
+          runOnJS(startDeleteFromWorklet)();
+
+          // Absorb: pull image into the trash center and scale to 0.
+          const absorbTx = DELETE_ZONE_CENTER_X - SCREEN_WIDTH / 2;
+          const absorbTy = DELETE_ZONE_CENTER_Y - SCREEN_HEIGHT / 2;
+          liftTx.value = withSpring(absorbTx, SpringPresets.snappy);
+          liftTy.value = withSpring(absorbTy, SpringPresets.snappy);
+          liftScale.value = withTiming(
+            0,
+            {duration: 240, easing: Easing.out(Easing.cubic)},
+            finished => {
+              'worklet';
+              if (!finished) return;
+              if (reducedMotionShared.value) {
+                runOnJS(triggerSuccessHaptic)();
+                runOnJS(handleAbsorbedDelete)();
+                return;
+              }
+              // Trash bite bounce + radial burst + success haptic + commit.
+              dropZoneScale.value = withSequence(
+                withTiming(1.35, {duration: 120}),
+                withSpring(1, SpringPresets.bouncy),
+              );
+              burstProgress.value = withTiming(1, {
+                duration: 420,
+                easing: Easing.out(Easing.cubic),
+              });
+              runOnJS(triggerSuccessHaptic)();
+              runOnJS(handleAbsorbedDelete)();
+            },
+          );
+          return;
+        }
+
+        // Fly-back-to-tile path (original behavior, unchanged).
         const tileCenterX = sourceRectX.value + sourceRectW.value / 2;
         const tileCenterY = sourceRectY.value + sourceRectW.value / 2;
         const targetTx = tileCenterX - SCREEN_WIDTH / 2;
@@ -340,14 +548,25 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
   }, [
     activateLift,
     backdropOpacity,
+    burstProgress,
+    canDeleteShared,
     closeViewer,
+    dropZoneGlow,
+    dropZoneScale,
+    handleAbsorbedDelete,
+    isDeletingShared,
     isLiftedShared,
+    isOverDeleteShared,
     liftScale,
     liftTx,
     liftTy,
+    reducedMotionShared,
     sourceRectW,
     sourceRectX,
     sourceRectY,
+    startDeleteFromWorklet,
+    triggerHoverHaptic,
+    triggerSuccessHaptic,
   ]);
 
   return (
@@ -378,8 +597,30 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
             />
           </GestureDetector>
 
+          {canDelete ? (
+            <View style={styles.dropZoneLayer} pointerEvents="none">
+              <Animated.View
+                style={[styles.dropZoneRing, dropZoneRingStyle]}
+              />
+              <Animated.View style={[styles.dropZone, dropZoneStyle]}>
+                <TrashIcon size={32} color="#FFFFFF" />
+              </Animated.View>
+              {BURST_DOT_ANGLES.map((angle, i) => (
+                <View
+                  key={i}
+                  pointerEvents="none"
+                  style={styles.burstAnchor}>
+                  <BurstDot angle={angle} progress={burstProgress} />
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           <View style={styles.modalTopBar} pointerEvents="box-none">
-            {isOwnProfile && selectedMedia?.bucket && selectedMedia?.path ? (
+            {isOwnProfile &&
+            selectedMedia?.bucket &&
+            selectedMedia?.path &&
+            !isLifted ? (
               <Animated.View style={deletePress.animatedStyle}>
                 <Pressable
                   style={[
@@ -440,8 +681,16 @@ const ProfileMediaViewer = React.memo(function ProfileMediaViewer({
   );
 });
 
+type PendingDelete = {
+  item: MediaItem;
+  position: {pageIndex: number; itemIndex: number};
+};
+
 export function ProfileMediaTab({userId, headerComponent, isOwnProfile}: ProfileMediaTabProps) {
   const [viewerState, setViewerState] = useState<ViewerState | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const undoButtonPress = useSpringPress(0.94);
   const profileMediaQueryKey = useMemo(() => ['profileMedia', userId] as const, [userId]);
 
   const query = useInfiniteQuery({
@@ -490,6 +739,55 @@ export function ProfileMediaTab({userId, headerComponent, isOwnProfile}: Profile
     onError: e => Alert.alert('Error', e instanceof Error ? e.message : 'Failed to delete'),
   });
 
+  const removeItemFromCache = useCallback(
+    (item: MediaItem): PendingDelete['position'] | null => {
+      const cached = queryClient.getQueryData<any>(profileMediaQueryKey);
+      if (!cached?.pages) return null;
+      let foundPageIndex = -1;
+      let foundItemIndex = -1;
+      const newPages = cached.pages.map((page: any, pageIdx: number) => {
+        if (!Array.isArray(page?.data)) return page;
+        const idx = page.data.findIndex((m: MediaItem) => m.id === item.id);
+        if (idx < 0 || foundPageIndex >= 0) return page;
+        foundPageIndex = pageIdx;
+        foundItemIndex = idx;
+        return {
+          ...page,
+          data: page.data.filter((_: any, i: number) => i !== idx),
+        };
+      });
+      if (foundPageIndex < 0) return null;
+      queryClient.setQueryData(profileMediaQueryKey, {
+        ...cached,
+        pages: newPages,
+      });
+      return {pageIndex: foundPageIndex, itemIndex: foundItemIndex};
+    },
+    [profileMediaQueryKey],
+  );
+
+  const restoreItemToCache = useCallback(
+    (item: MediaItem, position: PendingDelete['position']) => {
+      const cached = queryClient.getQueryData<any>(profileMediaQueryKey);
+      if (!cached?.pages) return;
+      const newPages = cached.pages.map((page: any, pageIdx: number) => {
+        if (pageIdx !== position.pageIndex || !Array.isArray(page?.data)) {
+          return page;
+        }
+        if (page.data.some((m: MediaItem) => m.id === item.id)) return page;
+        const next = [...page.data];
+        const insertAt = Math.min(position.itemIndex, next.length);
+        next.splice(insertAt, 0, item);
+        return {...page, data: next};
+      });
+      queryClient.setQueryData(profileMediaQueryKey, {
+        ...cached,
+        pages: newPages,
+      });
+    },
+    [profileMediaQueryKey],
+  );
+
   const handleDelete = useCallback(
     (item: MediaItem) => {
       Alert.alert(
@@ -507,6 +805,51 @@ export function ProfileMediaTab({userId, headerComponent, isOwnProfile}: Profile
     },
     [deleteMutation],
   );
+
+  const handleDragDelete = useCallback(
+    (item: MediaItem) => {
+      if (undoTimerRef.current) {
+        clearTimeout(undoTimerRef.current);
+        undoTimerRef.current = null;
+      }
+      const position = removeItemFromCache(item);
+      if (!position) return;
+      setPendingDelete({item, position});
+      undoTimerRef.current = setTimeout(() => {
+        undoTimerRef.current = null;
+        setPendingDelete(null);
+        deleteMutation.mutate(item, {
+          onError: () => {
+            restoreItemToCache(item, position);
+          },
+        });
+      }, 4000);
+    },
+    [deleteMutation, removeItemFromCache, restoreItemToCache],
+  );
+
+  const handleUndo = useCallback(() => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setPendingDelete(current => {
+      if (current) {
+        restoreItemToCache(current.item, current.position);
+        Haptics.tap();
+      }
+      return null;
+    });
+  }, [restoreItemToCache]);
+
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) {
+        clearTimeout(undoTimerRef.current);
+        undoTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const closeViewer = useCallback(() => {
     setViewerState(null);
@@ -565,8 +908,27 @@ export function ProfileMediaTab({userId, headerComponent, isOwnProfile}: Profile
           isOwnProfile={isOwnProfile}
           deletePending={deleteMutation.isPending}
           onDelete={handleDelete}
+          onDragDelete={handleDragDelete}
           onClose={closeViewer}
         />
+      ) : null}
+      {pendingDelete ? (
+        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          <View style={styles.undoToast}>
+            <Text style={styles.undoToastText}>Image deleted</Text>
+            <Animated.View style={undoButtonPress.animatedStyle}>
+              <Pressable
+                onPress={handleUndo}
+                onPressIn={undoButtonPress.onPressIn}
+                onPressOut={undoButtonPress.onPressOut}
+                style={styles.undoButton}
+                accessibilityRole="button"
+                accessibilityLabel="Undo delete">
+                <Text style={styles.undoButtonText}>Undo</Text>
+              </Pressable>
+            </Animated.View>
+          </View>
+        </View>
       ) : null}
     </>
   );
@@ -691,5 +1053,96 @@ const styles = StyleSheet.create({
   fullImage: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT * 0.78,
+  },
+  dropZoneLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+  },
+  dropZone: {
+    position: 'absolute',
+    left: DELETE_ZONE_CENTER_X - DELETE_ZONE_SIZE / 2,
+    top: DELETE_ZONE_CENTER_Y - DELETE_ZONE_SIZE / 2,
+    width: DELETE_ZONE_SIZE,
+    height: DELETE_ZONE_SIZE,
+    borderRadius: DELETE_ZONE_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239,68,68,0.92)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)',
+    shadowColor: '#EF4444',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.55,
+    shadowRadius: 24,
+    elevation: 14,
+  },
+  dropZoneRing: {
+    position: 'absolute',
+    left: DELETE_ZONE_CENTER_X - DELETE_ZONE_SIZE / 2,
+    top: DELETE_ZONE_CENTER_Y - DELETE_ZONE_SIZE / 2,
+    width: DELETE_ZONE_SIZE,
+    height: DELETE_ZONE_SIZE,
+    borderRadius: DELETE_ZONE_SIZE / 2,
+    borderWidth: 2,
+    borderColor: 'rgba(239,68,68,0.9)',
+  },
+  burstAnchor: {
+    position: 'absolute',
+    left: DELETE_ZONE_CENTER_X - 5,
+    top: DELETE_ZONE_CENTER_Y - 5,
+    width: 10,
+    height: 10,
+  },
+  burstDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#EF4444',
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  undoToast: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingVertical: 10,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(20,16,14,0.96)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    elevation: 12,
+  },
+  undoToastText: {
+    color: '#FFFFFF',
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 14,
+    letterSpacing: 0.2,
+  },
+  undoButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(196,148,62,0.55)',
+  },
+  undoButtonText: {
+    color: '#E8C581',
+    fontFamily: fonts.ui.semiBold,
+    fontSize: 13,
+    letterSpacing: 0.4,
   },
 });

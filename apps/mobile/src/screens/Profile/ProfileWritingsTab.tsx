@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {FlatList, StyleSheet, View} from 'react-native';
 import {useInfiniteQuery, useMutation} from '@tanstack/react-query';
 import {useNavigation} from '@react-navigation/native';
@@ -38,6 +38,16 @@ export function ProfileWritingsTab({userId, headerComponent}: ProfileWritingsTab
   const [repostModal, setRepostModal] = useState<{journalId: string; title?: string; authorName?: string; authorAvatar?: string} | null>(null);
 
   const isOwnProfile = userId === user?.id;
+
+  const handleContinue = useCallback(
+    (journalId: string) => {
+      navigation.navigate('JournalEditor', {
+        mode: 'create',
+        parentJournalId: journalId,
+      });
+    },
+    [navigation],
+  );
 
   const query = useInfiniteQuery({
     queryKey: ['profileWritings', userId],
@@ -216,6 +226,12 @@ export function ProfileWritingsTab({userId, headerComponent}: ProfileWritingsTab
             onBookmark={() => handleBookmark(item.id)}
             onRepost={() => handleRepost(item.id, item.title ?? undefined, item.users?.name ?? undefined, item.users?.image_url ?? undefined)}
             shareId={item.id}
+            journalId={item.id}
+            rootJournalId={item.root_journal_id}
+            showThreadPreview
+            parentJournalId={item.parent_journal_id}
+            showContinueAction
+            onContinue={handleContinue}
             onPress={() =>
               navigation.navigate('PostDetail', {journalId: item.id})
             }

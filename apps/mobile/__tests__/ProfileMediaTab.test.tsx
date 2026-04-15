@@ -24,6 +24,8 @@ jest.mock('react-native', () => {
     },
     ActivityIndicator: (props: Record<string, unknown>) =>
       ReactLib.createElement('ActivityIndicator', props),
+    Image: (props: Record<string, unknown>) =>
+      ReactLib.createElement('Image', props),
     Modal: ({children, visible, ...props}: Record<string, any>) =>
       visible ? ReactLib.createElement('Modal', props, children) : null,
     Pressable: ({children, ...props}: Record<string, any>) =>
@@ -96,7 +98,14 @@ jest.mock('react-native-reanimated', () => {
     runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
     useAnimatedStyle: (fn: () => unknown) => fn(),
     useSharedValue: (initial: unknown) => ({value: initial}),
+    useReducedMotion: () => false,
     withSpring: (value: unknown) => value,
+    withTiming: (value: unknown) => value,
+    withSequence: (...values: unknown[]) => values[values.length - 1],
+    Easing: {
+      out: (fn: unknown) => fn,
+      cubic: (t: number) => t,
+    },
   };
 });
 
@@ -183,12 +192,16 @@ jest.mock('../src/lib/haptics', () => ({
   Haptics: {
     tap: jest.fn(),
     selection: jest.fn(),
+    success: jest.fn(),
+    milestone: jest.fn(),
   },
 }));
 
 jest.mock('../src/lib/springs', () => ({
   SpringPresets: {
     snappy: {},
+    bouncy: {},
+    gentle: {},
   },
   useSpringPress: () => ({
     animatedStyle: {},

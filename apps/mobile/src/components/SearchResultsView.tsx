@@ -1,5 +1,7 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {FlatList, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {PostCard} from './PostCard/PostCard';
 import {Chip} from './Chip';
 import {Avatar} from './Avatar';
@@ -10,6 +12,7 @@ import {typeScale} from '../theme/typography';
 import {spacing} from '../theme/spacing';
 import type {SearchTab} from '../hooks/useSearch';
 import type {JournalItem, UserPreview} from '../lib/api/mobileApi';
+import type {RootStackParamList} from '../navigation/types';
 import {COMPACT_VERTICAL_LIST_PROPS} from '../lib/listPerformance';
 import {
   getJournalCardData,
@@ -53,6 +56,18 @@ export function SearchResultsView({
   onEmbeddedPress,
 }: SearchResultsViewProps) {
   const {colors, scaledType} = useTheme();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const handleContinue = useCallback(
+    (journalId: string) => {
+      navigation.navigate('JournalEditor', {
+        mode: 'create',
+        parentJournalId: journalId,
+      });
+    },
+    [navigation],
+  );
 
   const renderPostCard = (item: JournalItem) => {
     const cardData = getJournalCardData(item);
@@ -90,6 +105,12 @@ export function SearchResultsView({
         }
         onPress={() => onPostPress(item.id)}
         shareId={item.id}
+        journalId={item.id}
+        rootJournalId={item.root_journal_id}
+        showThreadPreview
+        parentJournalId={item.parent_journal_id}
+        showContinueAction
+        onContinue={handleContinue}
         onAuthorPress={() => onAuthorPress(item)}
         isRepost={isRepost}
         repostCaption={item.repost_caption}

@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {FlatList, StyleSheet, View} from 'react-native';
 import {useInfiniteQuery} from '@tanstack/react-query';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
@@ -33,6 +33,16 @@ export function PromptResponsesScreen({route, navigation}: Props) {
     [query.data?.pages],
   );
 
+  const handleContinue = useCallback(
+    (journalId: string) => {
+      navigation.navigate('JournalEditor', {
+        mode: 'create',
+        parentJournalId: journalId,
+      });
+    },
+    [navigation],
+  );
+
   return (
     <SafeAreaView style={[styles.safe, {backgroundColor: colors.bgPrimary}]} edges={['top']}>
       <ScreenEntrance tier="feed">
@@ -63,6 +73,12 @@ export function PromptResponsesScreen({route, navigation}: Props) {
               bannerImage={cardData.bannerImage}
               readingTime={cardData.readingTime}
               shareId={item.id}
+              journalId={item.id}
+              rootJournalId={item.root_journal_id}
+              showThreadPreview
+              parentJournalId={item.parent_journal_id}
+              showContinueAction
+              onContinue={handleContinue}
               onPress={() => navigation.navigate('PostDetail', {journalId: item.id})}
               onAuthorPress={() => {
                 const authorId = item.users?.id ?? item.user_id;

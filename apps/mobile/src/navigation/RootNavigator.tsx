@@ -45,6 +45,7 @@ import {WritingPreferencesScreen} from '../screens/Settings/WritingPreferencesSc
 import {PostDetailScreen} from '../screens/Home/PostDetailScreen';
 import {JournalEditorScreen} from '../screens/Editor/JournalEditorScreen';
 import {EchoBloomScreen} from '../screens/EchoBloom/EchoBloomScreen';
+import {ThreadScreen} from '../screens/EchoBloom/ThreadScreen';
 import {DraftsScreen} from '../screens/Editor/DraftsScreen';
 import {BookmarksScreen} from '../screens/Profile/BookmarksScreen';
 import {StoryBrowserScreen} from '../screens/Stories/StoryBrowserScreen';
@@ -547,6 +548,11 @@ export function RootNavigator() {
                 presentation: 'fullScreenModal',
                 animation: 'fade',
               }}
+            />
+            <RootStack.Screen
+              name="Thread"
+              component={ThreadScreen}
+              options={{title: 'Thread'}}
             />
             <RootStack.Screen
               name="StoryDetail"

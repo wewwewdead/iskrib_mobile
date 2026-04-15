@@ -19,6 +19,7 @@ export type RootStackParamList = {
   PostDetail: {journalId: string; slug?: string};
   JournalEditor: {mode: 'create' | 'draft' | 'edit'; journalId?: string; promptId?: string; promptText?: string; parentJournalId?: string};
   EchoBloom: {journalId: string};
+  Thread: {journalId: string};
   StoryDetail: {storyId: string};
   StoryEditor: {storyId?: string};
   StoryDashboard: undefined;

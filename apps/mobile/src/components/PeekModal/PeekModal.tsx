@@ -118,7 +118,7 @@ export function PeekModal({
   onClose,
   onOpenFull,
 }: PeekModalProps) {
-  const {colors} = useTheme();
+  const {colors, isDark} = useTheme();
   const {user} = useAuth();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
@@ -329,7 +329,6 @@ export function PeekModal({
 
   // Backdrop opacity is darker in dark mode to maintain perceptual contrast
   // over the dark bgPrimary.
-  const isDark = colors.bgPrimary !== '#FAF9F6';
   const backdropBg = isDark ? 'rgba(0,0,0,0.70)' : 'rgba(0,0,0,0.55)';
 
   // Resolve content source. If content is populated, use it. If not,

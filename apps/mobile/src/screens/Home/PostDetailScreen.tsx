@@ -160,6 +160,12 @@ export function PostDetailScreen({route, navigation}: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({queryKey: ['feed']});
       queryClient.invalidateQueries({queryKey: ['profileWritings']});
+      // Deleting a thread member leaves stale rows in every thread
+      // cache that referenced it. All three thread query namespaces
+      // use different prefixes so we invalidate each explicitly.
+      queryClient.invalidateQueries({queryKey: ['journal-thread']});
+      queryClient.invalidateQueries({queryKey: ['journal-thread-preview']});
+      queryClient.invalidateQueries({queryKey: ['journal-thread-panel']});
       navigation.goBack();
     },
     onError: e => Alert.alert('Delete failed', e instanceof Error ? e.message : 'Error'),

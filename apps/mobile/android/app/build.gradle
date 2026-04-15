@@ -36,7 +36,7 @@ def readReleaseSigningValue = { String fileKey, String envKey ->
 }
 
 def androidApplicationId = readEnvOrProperty("ISKRIB_ANDROID_APPLICATION_ID", "com.iskrib.mobile")
-def androidVersionCode = readEnvOrProperty("ISKRIB_ANDROID_VERSION_CODE", "18").toInteger()
+def androidVersionCode = readEnvOrProperty("ISKRIB_ANDROID_VERSION_CODE", "21").toInteger()
 def androidVersionName = readEnvOrProperty("ISKRIB_ANDROID_VERSION_NAME", "1.2.12")
 
 def releaseStoreFile = readReleaseSigningValue("storeFile", "ISKRIB_UPLOAD_STORE_FILE")

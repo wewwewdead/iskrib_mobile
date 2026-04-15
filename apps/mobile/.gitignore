@@ -58,6 +58,12 @@ yarn-error.log
 # Bundle artifact
 *.jsbundle
 
+# Android release binaries — build outputs, not source
+android/app/release/
+*.aab
+*.apk
+android/bugreport-*.zip
+
 # Ruby / CocoaPods
 **/Pods/
 /vendor/bundle/

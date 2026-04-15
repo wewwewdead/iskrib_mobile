@@ -39,10 +39,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'EchoBloom'>;
 // restart the spring.
 const DELAY_ECHO_1 = 400;
 const DELAY_ECHO_2 = 560;
-const DELAY_YOUR_ECHO = 720;
-const DELAY_PROMPT_SIBLING = 860;
 const DELAY_CAPTION = 920;
-const DELAY_CTA = 1080;
+const DELAY_MORE_ECHOES_START = 1040;
+const DELAY_MORE_ECHOES_STAGGER = 120;
+const DELAY_YOUR_ECHO_OFFSET = 160;
+const DELAY_PROMPT_SIBLING_OFFSET = 300;
+const DELAY_CTA_OFFSET = 480;
 const CARD_HAPTIC_OFFSET = 80;
 
 function captionFor(
@@ -79,11 +81,29 @@ export function EchoBloomScreen({navigation, route}: Props) {
   // here would make the chip's delta detection drift out of sync.
   const echoesSummary = useEchoesSummary(journalId);
 
-  const echoPrimary = echoes[0] ?? null;
-  const echoSecondary = echoes[1] ?? null;
+  // First two echoes sit in the featured top row; anything beyond
+  // that gets rendered in a "More echoes" vertical section below the
+  // center. Splitting here keeps the render logic simple and lets
+  // the entrance timeline compose cleanly.
+  const featuredEchoes = echoes.slice(0, 2);
+  const moreEchoes = echoes.slice(2);
+  const echoPrimary = featuredEchoes[0] ?? null;
+  const echoSecondary = featuredEchoes[1] ?? null;
+
+  // Derive later-in-list delays from the "More echoes" count so extra
+  // cards never crowd the subsequent sections' entrance timing.
+  const moreEchoesTailDelay =
+    moreEchoes.length > 0
+      ? DELAY_MORE_ECHOES_START +
+        moreEchoes.length * DELAY_MORE_ECHOES_STAGGER
+      : DELAY_CAPTION;
+  const yourEchoDelay = moreEchoesTailDelay + DELAY_YOUR_ECHO_OFFSET;
+  const promptSiblingDelay =
+    moreEchoesTailDelay + DELAY_PROMPT_SIBLING_OFFSET;
+  const ctaDelay = moreEchoesTailDelay + DELAY_CTA_OFFSET;
 
   const captionStyle = useSpringFadeIn(DELAY_CAPTION);
-  const ctaStyle = useSpringEntrance(DELAY_CTA, 16, 0.98);
+  const ctaStyle = useSpringEntrance(ctaDelay, 16, 0.98);
   const {
     animatedStyle: primaryPressStyle,
     onPressIn: primaryPressIn,
@@ -125,18 +145,18 @@ export function EchoBloomScreen({navigation, route}: Props) {
     const id = setTimeout(() => {
       Haptics.softTap();
       logBloomEvent('your_echo', 'reveal');
-    }, DELAY_YOUR_ECHO + CARD_HAPTIC_OFFSET);
+    }, yourEchoDelay + CARD_HAPTIC_OFFSET);
     return () => clearTimeout(id);
-  }, [yourEcho]);
+  }, [yourEcho, yourEchoDelay]);
 
   useEffect(() => {
     if (!promptSibling) return;
     const id = setTimeout(() => {
       Haptics.softTap();
       logBloomEvent('prompt_sibling', 'reveal');
-    }, DELAY_PROMPT_SIBLING + CARD_HAPTIC_OFFSET);
+    }, promptSiblingDelay + CARD_HAPTIC_OFFSET);
     return () => clearTimeout(id);
-  }, [promptSibling]);
+  }, [promptSibling, promptSiblingDelay]);
 
   const openCompanion = useCallback(
     (kind: EchoCardKind, post: JournalItem) => {
@@ -164,6 +184,17 @@ export function EchoBloomScreen({navigation, route}: Props) {
     navigation.replace('PostDetail', {journalId});
   }, [navigation, journalId]);
 
+  // V3 — "View thread" CTA. Gated strictly on the just-published post
+  // actually having a parent. After "Continue this thought" this is
+  // always true; for a standalone publish it's false and the CTA
+  // doesn't render. No fabrication.
+  const hasThreadParent = Boolean(center?.parent_journal_id);
+  const handleOpenThread = useCallback(() => {
+    logBloomEvent('center', 'open');
+    Haptics.tap();
+    navigation.push('Thread', {journalId});
+  }, [navigation, journalId]);
+
   const handleDismiss = useCallback(() => {
     logBloomEvent('center', 'dismiss');
     navigation.goBack();
@@ -181,6 +212,7 @@ export function EchoBloomScreen({navigation, route}: Props) {
   const fullCardWidth = Math.min(screenWidth - spacing.xl * 2, 480);
 
   const hasAnyEcho = Boolean(echoPrimary);
+  const hasMoreEchoes = moreEchoes.length > 0;
   const hasYourEcho = Boolean(yourEcho);
   const hasPromptSibling = Boolean(promptSibling);
   const hasCompanion = hasAnyEcho || hasYourEcho || hasPromptSibling;
@@ -209,6 +241,7 @@ export function EchoBloomScreen({navigation, route}: Props) {
                 kind="echo"
                 label="An echo"
                 journal={echoSecondary}
+                similarity={echoSecondary.semantic_similarity}
                 delay={DELAY_ECHO_2}
                 width={rowCardWidth}
                 onPress={() => openCompanion('echo', echoSecondary)}
@@ -219,6 +252,7 @@ export function EchoBloomScreen({navigation, route}: Props) {
                 kind="echo"
                 label="An echo"
                 journal={echoPrimary}
+                similarity={echoPrimary.semantic_similarity}
                 delay={DELAY_ECHO_1}
                 width={echoSecondary ? rowCardWidth : fullCardWidth}
                 onPress={() => openCompanion('echo', echoPrimary)}
@@ -243,13 +277,45 @@ export function EchoBloomScreen({navigation, route}: Props) {
           {captionText}
         </Animated.Text>
 
+        {hasMoreEchoes ? (
+          <View style={styles.moreEchoesSection}>
+            <Text
+              style={[
+                styles.moreEchoesHeader,
+                {
+                  color: colors.textMuted,
+                  fontFamily: fonts.ui.semiBold,
+                },
+              ]}>
+              More echoes
+            </Text>
+            <View style={styles.moreEchoesList}>
+              {moreEchoes.map((echo, index) => (
+                <EchoCard
+                  key={echo.id}
+                  kind="echo"
+                  label="An echo"
+                  journal={echo}
+                  similarity={echo.semantic_similarity}
+                  delay={
+                    DELAY_MORE_ECHOES_START +
+                    index * DELAY_MORE_ECHOES_STAGGER
+                  }
+                  width={fullCardWidth}
+                  onPress={() => openCompanion('echo', echo)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         {hasYourEcho && yourEcho ? (
           <View style={styles.companionWrap}>
             <EchoCard
               kind="your_echo"
               label="From your writing"
               journal={yourEcho}
-              delay={DELAY_YOUR_ECHO}
+              delay={yourEchoDelay}
               width={fullCardWidth}
               onPress={() => openCompanion('your_echo', yourEcho)}
             />
@@ -262,7 +328,7 @@ export function EchoBloomScreen({navigation, route}: Props) {
               kind="prompt_sibling"
               label="Answering the same prompt"
               journal={promptSibling}
-              delay={DELAY_PROMPT_SIBLING}
+              delay={promptSiblingDelay}
               width={fullCardWidth}
               onPress={() => openCompanion('prompt_sibling', promptSibling)}
             />
@@ -306,6 +372,23 @@ export function EchoBloomScreen({navigation, route}: Props) {
               Open post
             </Text>
           </Pressable>
+
+          {hasThreadParent ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="View this thread"
+              onPress={handleOpenThread}
+              hitSlop={8}
+              style={styles.secondaryCta}>
+              <Text
+                style={[
+                  styles.secondaryCtaLabel,
+                  {color: colors.accentGold, fontFamily: fonts.ui.semiBold},
+                ]}>
+                View thread →
+              </Text>
+            </Pressable>
+          ) : null}
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
@@ -344,6 +427,22 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     justifyContent: 'center',
     marginBottom: spacing.xxl,
+  },
+  moreEchoesSection: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  moreEchoesHeader: {
+    ...typeScale.label,
+    alignSelf: 'flex-start',
+    marginLeft: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  moreEchoesList: {
+    width: '100%',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   centerWrap: {
     marginBottom: spacing.xxl,

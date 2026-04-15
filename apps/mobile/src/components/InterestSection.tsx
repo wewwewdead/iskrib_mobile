@@ -1,5 +1,7 @@
-import React from 'react';
+import React, {useCallback} from 'react';
 import {FlatList, StyleSheet, Text, View} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {PostCard} from './PostCard/PostCard';
 import {useTheme} from '../theme/ThemeProvider';
 import {HORIZONTAL_CARD_LIST_PROPS} from '../lib/listPerformance';
@@ -8,6 +10,7 @@ import {typeScale} from '../theme/typography';
 import {spacing} from '../theme/spacing';
 import type {JournalItem} from '../lib/api/mobileApi';
 import type {PeekSourceRect} from '../hooks/usePeekModal';
+import type {RootStackParamList} from '../navigation/types';
 
 interface InterestSectionProps {
   name: string;
@@ -31,6 +34,21 @@ export function InterestSection({
   onLongPressPost,
 }: InterestSectionProps) {
   const {colors, scaledType} = useTheme();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  // Stable callback — one instance per InterestSection instead of one
+  // per rendered card. Lets React.memo actually do its job on PostCard
+  // when the horizontal FlatList recycles rows on scroll.
+  const handleContinue = useCallback(
+    (journalId: string) => {
+      navigation.navigate('JournalEditor', {
+        mode: 'create',
+        parentJournalId: journalId,
+      });
+    },
+    [navigation],
+  );
 
   if (!journals || journals.length === 0) return null;
 
@@ -66,6 +84,12 @@ export function InterestSection({
                     : undefined
                 }
                 shareId={item.id}
+                journalId={item.id}
+                rootJournalId={item.root_journal_id}
+                showThreadPreview
+                parentJournalId={item.parent_journal_id}
+                showContinueAction
+                onContinue={handleContinue}
                 onReact={() => {}}
                 onComment={() => {}}
                 onBookmark={() => {}}

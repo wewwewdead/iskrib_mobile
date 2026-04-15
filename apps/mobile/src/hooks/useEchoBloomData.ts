@@ -79,16 +79,16 @@ export function useEchoBloomData(
     // Echoes: posts by OTHER authors. The /related endpoint already
     // applies a same-author penalty in ranking, but does not strictly
     // exclude them — so we filter here for the cross-author slots.
-    const echoes: RelatedPostEntry[] = related
-      .filter(
-        item =>
-          item.user_id && userId
-            ? item.user_id !== userId
-            : item.users?.id
-              ? item.users.id !== userId
-              : true,
-      )
-      .slice(0, 2);
+    // No client-side cap: the server already limits the result set
+    // (see find_related_posts `match_count`), and Echo Bloom now
+    // renders the full list as a vertical stack.
+    const echoes: RelatedPostEntry[] = related.filter(item =>
+      item.user_id && userId
+        ? item.user_id !== userId
+        : item.users?.id
+          ? item.users.id !== userId
+          : true,
+    );
 
     const userEchoPosts = userEchoesQuery.data?.posts ?? [];
     const yourEcho: RelatedPostEntry | null = userEchoPosts[0] ?? null;

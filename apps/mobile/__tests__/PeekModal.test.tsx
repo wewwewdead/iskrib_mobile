@@ -61,6 +61,7 @@ jest.mock('../src/features/auth/AuthProvider', () => ({
 
 jest.mock('../src/theme/ThemeProvider', () => ({
   useTheme: () => ({
+    isDark: false,
     colors: {
       bgPrimary: '#FAF9F6',
       bgElevated: '#FFFFFF',

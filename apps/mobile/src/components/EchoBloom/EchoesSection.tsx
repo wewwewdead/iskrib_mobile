@@ -1,10 +1,13 @@
 import React, {useCallback} from 'react';
 import {FlatList, Pressable, StyleSheet, Text, View} from 'react-native';
+import Animated from 'react-native-reanimated';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import Svg, {Circle} from 'react-native-svg';
 import {NetworkImage} from '../NetworkImage';
 import {useEchoesSummary} from '../../hooks/useEchoesSummary';
 import {Haptics} from '../../lib/haptics';
+import {useSpringPress} from '../../lib/springs';
 import {HORIZONTAL_CARD_LIST_PROPS} from '../../lib/listPerformance';
 import {useTheme} from '../../theme/ThemeProvider';
 import {fonts, typeScale} from '../../theme/typography';
@@ -31,6 +34,8 @@ function EchoesSectionImpl({journalId}: EchoesSectionProps) {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {posts, hasEchoes, isLoading, count} = useEchoesSummary(journalId);
+  const {animatedStyle: bloomPressStyle, onPressIn: onBloomPressIn, onPressOut: onBloomPressOut} =
+    useSpringPress(0.97);
 
   const openPost = useCallback(
     (post: RelatedPostEntry) => {
@@ -112,20 +117,68 @@ function EchoesSectionImpl({journalId}: EchoesSectionProps) {
         }}
       />
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open Echo Bloom for this post"
-        onPress={openBloom}
-        hitSlop={8}
-        style={styles.bloomCta}>
-        <Text
+      <Animated.View style={[styles.bloomCtaWrap, bloomPressStyle]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open Echo Bloom for this post"
+          onPress={openBloom}
+          onPressIn={onBloomPressIn}
+          onPressOut={onBloomPressOut}
+          hitSlop={8}
           style={[
-            styles.bloomCtaLabel,
-            {color: colors.accentGold, fontFamily: fonts.ui.semiBold},
+            styles.bloomCta,
+            {
+              backgroundColor: `${colors.accentGold}14`,
+              borderColor: `${colors.accentGold}66`,
+            },
           ]}>
-          Open in Echo Bloom →
-        </Text>
-      </Pressable>
+          <View style={styles.bloomCtaIcon}>
+            <Svg width={18} height={18} viewBox="0 0 18 18">
+              <Circle
+                cx={9}
+                cy={9}
+                r={8}
+                stroke={colors.accentGold}
+                strokeWidth={1.1}
+                fill="none"
+                opacity={0.4}
+              />
+              <Circle
+                cx={9}
+                cy={9}
+                r={4.5}
+                stroke={colors.accentGold}
+                strokeWidth={1.25}
+                fill="none"
+              />
+              <Circle cx={9} cy={9} r={1.4} fill={colors.accentGold} />
+            </Svg>
+          </View>
+          <View style={styles.bloomCtaTextCol}>
+            <Text
+              style={[
+                styles.bloomCtaLabel,
+                {color: colors.accentGold, fontFamily: fonts.ui.semiBold},
+              ]}>
+              Open in Echo Bloom
+            </Text>
+            <Text
+              style={[
+                styles.bloomCtaHint,
+                {color: colors.textMuted, fontFamily: fonts.serif.italic},
+              ]}>
+              Follow the echoes of this post
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.bloomCtaArrow,
+              {color: colors.accentGold, fontFamily: fonts.ui.semiBold},
+            ]}>
+            →
+          </Text>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
@@ -173,14 +226,40 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui.regular,
     fontSize: 11,
   },
+  bloomCtaWrap: {
+    marginTop: spacing.lg,
+  },
   bloomCta: {
-    alignSelf: 'flex-start',
-    marginTop: spacing.md,
-    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    gap: spacing.md,
+  },
+  bloomCtaIcon: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bloomCtaTextCol: {
+    flex: 1,
+    gap: 2,
   },
   bloomCtaLabel: {
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 18,
     letterSpacing: 0.3,
+  },
+  bloomCtaHint: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  bloomCtaArrow: {
+    fontSize: 18,
+    lineHeight: 20,
+    marginLeft: spacing.xs,
   },
 });

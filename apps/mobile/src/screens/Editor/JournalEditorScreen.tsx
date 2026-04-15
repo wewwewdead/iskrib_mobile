@@ -82,6 +82,15 @@ const EDIT_PUBLISH_INVALIDATION_KEYS: ReadonlyArray<readonly unknown[]> = [
   ['drafts'],
 ];
 
+// Reply-publish adds a node to an existing thread chain, so every cached
+// thread surface (full-screen Thread, PostDetail ThreadPanel, inline
+// preview strip on feed cards) needs to be refetched — otherwise users
+// see a stale preview for 60s until react-query's staleTime elapses.
+const THREAD_INVALIDATION_KEYS: ReadonlyArray<readonly unknown[]> = [
+  ['journal-thread'],
+  ['journal-thread-preview'],
+];
+
 type Props = NativeStackScreenProps<RootStackParamList, 'JournalEditor'>;
 type ToastTone = 'success' | 'error' | 'info';
 
@@ -757,6 +766,7 @@ export function JournalEditorScreen({navigation, route}: Props) {
             title: capturedTitle,
             content: lexicalContent,
             draftId: journalId,
+            parentJournalId: capturedParentJournalId,
           });
           const publishResult = await mobileApi.publishDraft(journalId);
           resolvedJournalId = publishResult?.id ?? journalId;
@@ -781,6 +791,14 @@ export function JournalEditorScreen({navigation, route}: Props) {
 
         queryClient.invalidateQueries({queryKey: ['feed']});
         queryClient.invalidateQueries({queryKey: ['drafts']});
+        // Reply publish (capturedParentJournalId set) or republishing a
+        // draft whose parent may have been set earlier: bust every thread
+        // cache so the new reply appears in feed previews + thread views.
+        if (capturedParentJournalId || isDraftMode) {
+          THREAD_INVALIDATION_KEYS.forEach(queryKey =>
+            queryClient.invalidateQueries({queryKey}),
+          );
+        }
         Haptics.success();
 
         if (resolvedJournalId) {

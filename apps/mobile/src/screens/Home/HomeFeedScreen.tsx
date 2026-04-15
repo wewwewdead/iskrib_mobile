@@ -74,6 +74,7 @@ type HomeFeedPostCardProps = {
   onBookmark: (journalId: string) => void;
   onComment: (journalId: string, receiverId?: string, commentCount?: number) => void;
   onOpenPost: (journalId: string) => void;
+  onContinue: (journalId: string) => void;
   onPeek: (item: JournalItem, sourceRect?: PeekSourceRect) => void;
   onReact: (journalId: string, receiverId: string, reactionType: string) => void;
   onRepost: (
@@ -98,6 +99,7 @@ const HomeFeedPostCard = React.memo(function HomeFeedPostCard({
   onBookmark,
   onComment,
   onOpenPost,
+  onContinue,
   onPeek,
   onReact,
   onRepost,
@@ -178,6 +180,12 @@ const HomeFeedPostCard = React.memo(function HomeFeedPostCard({
       onPress={handleOpenPost}
       onLongPress={handlePeek}
       shareId={item.id}
+      journalId={item.id}
+      rootJournalId={item.root_journal_id}
+      showThreadPreview
+      parentJournalId={item.parent_journal_id}
+      showContinueAction
+      onContinue={onContinue}
       onAuthorPress={handleAuthorOpen}
       isRepost={isRepost}
       repostCaption={item.repost_caption}
@@ -553,6 +561,16 @@ export function HomeFeedScreen({navigation}: Props) {
     [activeQuery.isFetchingNextPage],
   );
 
+  const handleContinuePost = useCallback(
+    (journalId: string) => {
+      navigation.navigate('JournalEditor', {
+        mode: 'create',
+        parentJournalId: journalId,
+      });
+    },
+    [navigation],
+  );
+
   const renderPostItem = useCallback(
     ({item}: ListRenderItemInfo<JournalItem>) => (
       <HomeFeedPostCard
@@ -561,6 +579,7 @@ export function HomeFeedScreen({navigation}: Props) {
         onBookmark={handleBookmark}
         onComment={handleComment}
         onOpenPost={handleOpenPost}
+        onContinue={handleContinuePost}
         onPeek={openPeek}
         onReact={handleReact}
         onRepost={handleRepost}
@@ -572,6 +591,7 @@ export function HomeFeedScreen({navigation}: Props) {
       handleBookmark,
       handleComment,
       handleOpenPost,
+      handleContinuePost,
       handleReact,
       handleRepost,
       openPeek,
