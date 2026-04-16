@@ -1,5 +1,14 @@
-import React, {useMemo, useState} from 'react';
-import {Alert, FlatList, StyleSheet, Text, TextInput, View} from 'react-native';
+import React, {useEffect, useMemo, useState} from 'react';
+import {
+  Alert,
+  FlatList,
+  Keyboard,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import {useInfiniteQuery, useMutation, useQuery} from '@tanstack/react-query';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -22,6 +31,22 @@ export function OpinionDetailScreen({route, navigation}: Props) {
   const {colors} = useTheme();
   const isLoggedIn = !!session?.access_token;
   const [replyText, setReplyText] = useState('');
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, e => {
+      setKeyboardInset(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardInset(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const repliesQuery = useInfiniteQuery({
     queryKey: ['opinion-replies', opinionId],
@@ -52,52 +77,55 @@ export function OpinionDetailScreen({route, navigation}: Props) {
 
   return (
     <SafeAreaView style={[styles.safe, {backgroundColor: colors.bgPrimary}]} edges={['top']}>
-      <ScreenEntrance tier="hero">
-        <FlatList
-          data={replies}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.list}
-          onEndReachedThreshold={0.3}
-          onEndReached={() => {
-            if (repliesQuery.hasNextPage && !repliesQuery.isFetchingNextPage) repliesQuery.fetchNextPage();
-          }}
-          ListHeaderComponent={
-            parentOpinion ? (
-              <View style={styles.headerSection}>
-                <OpinionCard
-                  opinion={{...parentOpinion, users: parentOpinion.users ?? undefined}}
-                  onAuthorPress={() => {
-                    const authorId = parentOpinion.users?.id ?? parentOpinion.user_id;
-                    if (authorId && authorId !== user?.id) {
-                      navigation.navigate('VisitProfile', {userId: authorId, username: parentOpinion.users?.username});
-                    }
-                  }}
-                />
-                <Text style={[styles.repliesLabel, {color: colors.textMuted}]}>
-                  Replies
-                </Text>
-              </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            repliesQuery.isLoading ? null : (
-              <Text style={[styles.emptyText, {color: colors.textMuted}]}>No replies yet.</Text>
-            )
-          }
-          renderItem={({item}) => (
-            <OpinionCard
-              opinion={item}
-              onPress={() => navigation.push('OpinionDetail', {opinionId: item.id, parentOpinion: item})}
-              onAuthorPress={() => {
-                const authorId = item.users?.id ?? item.user_id;
-                if (authorId && authorId !== user?.id) {
-                  navigation.navigate('VisitProfile', {userId: authorId, username: item.users?.username});
-                }
-              }}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
+      <View style={[styles.flex, {paddingBottom: keyboardInset}]}>
+        <ScreenEntrance tier="hero" style={styles.flex}>
+          <FlatList
+            data={replies}
+            style={styles.flex}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.list}
+            onEndReachedThreshold={0.3}
+            onEndReached={() => {
+              if (repliesQuery.hasNextPage && !repliesQuery.isFetchingNextPage) repliesQuery.fetchNextPage();
+            }}
+            ListHeaderComponent={
+              parentOpinion ? (
+                <View style={styles.headerSection}>
+                  <OpinionCard
+                    opinion={{...parentOpinion, users: parentOpinion.users ?? undefined}}
+                    onAuthorPress={() => {
+                      const authorId = parentOpinion.users?.id ?? parentOpinion.user_id;
+                      if (authorId && authorId !== user?.id) {
+                        navigation.navigate('VisitProfile', {userId: authorId, username: parentOpinion.users?.username});
+                      }
+                    }}
+                  />
+                  <Text style={[styles.repliesLabel, {color: colors.textMuted}]}>
+                    Replies
+                  </Text>
+                </View>
+              ) : null
+            }
+            ListEmptyComponent={
+              repliesQuery.isLoading ? null : (
+                <Text style={[styles.emptyText, {color: colors.textMuted}]}>No replies yet.</Text>
+              )
+            }
+            renderItem={({item}) => (
+              <OpinionCard
+                opinion={item}
+                onPress={() => navigation.push('OpinionDetail', {opinionId: item.id, parentOpinion: item})}
+                onAuthorPress={() => {
+                  const authorId = item.users?.id ?? item.user_id;
+                  if (authorId && authorId !== user?.id) {
+                    navigation.navigate('VisitProfile', {userId: authorId, username: item.users?.username});
+                  }
+                }}
+              />
+            )}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+          />
+        </ScreenEntrance>
 
         {isLoggedIn ? (
           <View style={[styles.inputRow, {backgroundColor: colors.bgElevated, borderTopColor: colors.borderCard}]}>
@@ -118,13 +146,14 @@ export function OpinionDetailScreen({route, navigation}: Props) {
             />
           </View>
         ) : null}
-      </ScreenEntrance>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {flex: 1},
+  flex: {flex: 1},
   list: {padding: spacing.lg, paddingBottom: 100},
   headerSection: {marginBottom: spacing.lg},
   repliesLabel: {fontFamily: fonts.ui.semiBold, fontSize: 13, marginTop: spacing.lg, marginBottom: spacing.xs},

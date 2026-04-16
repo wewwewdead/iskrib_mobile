@@ -41,7 +41,7 @@ interface ProfileHeroProps {
   actionButton?: React.ReactNode;
 }
 
-export function ProfileHeroSection({
+function ProfileHeroSectionImpl({
   profile,
   streak,
   longestStreak,
@@ -257,9 +257,11 @@ export function ProfileHeroSection({
   );
 }
 
+export const ProfileHeroSection = React.memo(ProfileHeroSectionImpl);
+
 const styles = StyleSheet.create({
   headerBg: {
-    height: 140,
+    height: 220,
     borderBottomLeftRadius: radii.hero,
     borderBottomRightRadius: radii.hero,
     overflow: 'hidden',

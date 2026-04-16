@@ -1,10 +1,21 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, Platform, StyleSheet, View} from 'react-native';
+import {
+  ActivityIndicator,
+  LayoutChangeEvent,
+  Platform,
+  StyleSheet,
+  View,
+} from 'react-native';
+import {
+  Blur,
+  Canvas,
+  Image as SkiaImage,
+  useImage,
+} from '@shopify/react-native-skia';
 import {useQuery} from '@tanstack/react-query';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import {NetworkImage} from '../../components/NetworkImage';
 import {ScreenEntrance} from '../../components/ScreenEntrance';
 import {useAuth} from '../../features/auth/AuthProvider';
 import {useTheme} from '../../theme/ThemeProvider';
@@ -27,7 +38,8 @@ import type {RootStackParamList} from '../../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VisitProfile'>;
 
-const PROFILE_BACKDROP_BLUR_RADIUS = 24;
+const PROFILE_BACKDROP_BLUR_SIGMA = 22;
+const PROFILE_BACKDROP_IMAGE_OPACITY = 0.65;
 
 export function VisitProfileScreen({route, navigation}: Props) {
   const {userId} = route.params;
@@ -91,6 +103,19 @@ export function VisitProfileScreen({route, navigation}: Props) {
     [profile?.background],
   );
 
+  const backdropImageUri = parsedBg.type === 'image' ? parsedBg.uri : null;
+  const skBackdropImage = useImage(backdropImageUri);
+  const [backdropSize, setBackdropSize] = useState({width: 0, height: 0});
+
+  const onBackdropLayout = useCallback((e: LayoutChangeEvent) => {
+    const {width, height} = e.nativeEvent.layout;
+    setBackdropSize(prev =>
+      prev.width === width && prev.height === height
+        ? prev
+        : {width, height},
+    );
+  }, []);
+
   const onFollowersPress = useCallback(() => {
     navigation.navigate('FollowList', {userId, tab: 'followers'});
   }, [navigation, userId]);
@@ -144,41 +169,48 @@ export function VisitProfileScreen({route, navigation}: Props) {
           locations={gp.locations}
           start={start}
           end={end}
-          style={[StyleSheet.absoluteFill, styles.backdrop]}
+          style={[StyleSheet.absoluteFill, styles.backdropGradient]}
         />
       );
     }
     if (parsedBg.type === 'image') {
-      if (Platform.OS === 'android') {
-        return (
-          <LinearGradient
-            colors={imageBackdropGradient.colors}
-            locations={imageBackdropGradient.locations}
-            style={[StyleSheet.absoluteFill, styles.androidBackdrop]}
-          />
-        );
-      }
-
       return (
-        <View style={[StyleSheet.absoluteFill, styles.backdrop]}>
+        <View
+          style={StyleSheet.absoluteFill}
+          onLayout={onBackdropLayout}
+          pointerEvents="none">
           <LinearGradient
             colors={imageBackdropGradient.colors}
             locations={imageBackdropGradient.locations}
-            style={StyleSheet.absoluteFill}
+            style={[StyleSheet.absoluteFill, styles.backdropColorWash]}
           />
-          <NetworkImage
-            uri={parsedBg.uri}
-            blurRadius={PROFILE_BACKDROP_BLUR_RADIUS}
-            style={styles.backdropImage}
-            resizeMode="cover"
-            accessibilityLabel="Visited profile background image"
-            disableFadeIn
-          />
+          {skBackdropImage && backdropSize.width > 0 ? (
+            <Canvas style={StyleSheet.absoluteFill}>
+              <SkiaImage
+                image={skBackdropImage}
+                x={0}
+                y={0}
+                width={backdropSize.width}
+                height={backdropSize.height}
+                fit="cover"
+                opacity={PROFILE_BACKDROP_IMAGE_OPACITY}>
+                <Blur blur={PROFILE_BACKDROP_BLUR_SIGMA} />
+              </SkiaImage>
+            </Canvas>
+          ) : null}
         </View>
       );
     }
     return null;
-  }, [imageBackdropGradient.colors, imageBackdropGradient.locations, parsedBg]);
+  }, [
+    backdropSize.height,
+    backdropSize.width,
+    imageBackdropGradient.colors,
+    imageBackdropGradient.locations,
+    onBackdropLayout,
+    parsedBg,
+    skBackdropImage,
+  ]);
 
   const onToggleFollow = useCallback(() => {
     followMutation.mutate();
@@ -288,16 +320,11 @@ const styles = StyleSheet.create({
   tabSpacer: {
     height: 12,
   },
-  backdrop: {
-    opacity: 0.15,
-    transform: [{scale: 1.4}],
-  },
-  androidBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+  backdropGradient: {
     opacity: 0.22,
+    transform: [{scale: 1.3}],
   },
-  backdropImage: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.3,
+  backdropColorWash: {
+    opacity: 0.18,
   },
 });
